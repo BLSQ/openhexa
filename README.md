@@ -25,7 +25,7 @@ This repository **does not contain any code**: it is a starting point for OpenHe
 Roadmap and issues
 ==================
 
-You can find the publid roadmap [https://github.com/orgs/BLSQ/projects/3](here).
+You can find the publid roadmap [here](https://github.com/orgs/BLSQ/projects/3).
 
 Please report bugs in the issues section of this repository: https://github.com/BLSQ/openhexa/issues.
 
