@@ -21,8 +21,9 @@ You can find more information about OpenHexa on the [project page](https://www.b
    <img alt="OpenHexa Screenshot" src="https://test.openhexa.org/img/screenshot_catalog.png" hspace="10" height="150">
    <img alt="OpenHexa Screenshot" src="https://test.openhexa.org/img/screenshot_notebook.png" hspace="10" height="150">
 </div>
+<br/>
 
-This repository **does not contain any code**: it is a starting point for OpenHexa users and implementers.
+Please note that this repository **does not contain any code**: it is a starting point for OpenHexa users and implementers.
 
 Roadmap and issues
 ==================
