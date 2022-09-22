@@ -15,6 +15,8 @@ OpenHexa is an **open-source data integration platform** that allows users to:
 - Perform data analysis in **notebooks**
 - Create rich data **visualizations**
 
+You can find more information about OpenHexa on the [project page](https://www.bluesquarehub.com/openhexa/) on Bluesquare's website.
+
 <div align="center">
    <img alt="OpenHexa Screenshot" src="https://test.openhexa.org/img/screenshot_catalog.png" hspace="10" height="150">
    <img alt="OpenHexa Screenshot" src="https://test.openhexa.org/img/screenshot_notebook.png" hspace="10" height="150">
@@ -44,6 +46,8 @@ Please refer to the component-specific documentation in the above repositories i
 Deploying OpenHexa
 ==================
 
-Our recommendation for the deployment of a dedicated OpenHexa instance would be to use [Kubernetes](https://kubernetes.io/fr/).
+You can find more information about how to run OpenHexa in the different component repositories.
+
+More generally, our recommendation for the deployment of a dedicated OpenHexa instance would be to use [Kubernetes](https://kubernetes.io/fr/).
 
 We are currently in the process of writing detailed deployment documentation using Kubernetes, as well as open-sourcing a [Helm](https://helm.sh/) chart to facilitate deployments.
