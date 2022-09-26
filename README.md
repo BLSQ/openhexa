@@ -43,7 +43,7 @@ The OpenHexa platform is composed of **four main components**:
 - The [Pipelines component](https://github.com/BLSQ/openhexa-pipelines) a series of Pipelines running on [Airflow](https://airflow.apache.org/)
 
 <div align="center">
-   <img alt="OpenHexa Architecture" src="https://raw.githubusercontent.com/BLSQ/openhexa/main/visuals/architecture.png" hspace="10" height="150">
+   <img alt="OpenHexa Architecture" src="https://raw.githubusercontent.com/BLSQ/openhexa/main/visuals/architecture.png">
 </div>
 
 Please refer to the component-specific documentation in the above repositories if you need more details regarding the technical implementation.
