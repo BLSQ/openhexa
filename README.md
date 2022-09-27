@@ -35,12 +35,12 @@ Please report bugs in the issues section of this repository: https://github.com/
 OpenHexa architecture
 =====================
 
-The OpenHexa platform is composed of **four main components**:
+The OpenHexa platform is composed of **four main components**, corresponding to 4 different repositories:
 
-- The [App component](https://github.com/BLSQ/openhexa-app), a Django application that contains most of the OpenHexa business logic as well as a GraphQL API used by the other components
-- The [Frontend component](https://github.com/BLSQ/openhexa-frontend), a React/NextJS application that contains the user-facing part of OpenHexa
-- The [Notebooks component](https://github.com/BLSQ/openhexa-notebooks), a customized [JupyterHub](https://jupyter.org/hub) setup
-- The [Pipelines component](https://github.com/BLSQ/openhexa-pipelines) a series of Pipelines running on [Airflow](https://airflow.apache.org/)
+- [BLSQ/openhexa-app](https://github.com/BLSQ/openhexa-app): the **App component**, a Django application that contains most of the OpenHexa business logic as well as a GraphQL API used by the other components
+- [BLSQ/openhexa-frontend](https://github.com/BLSQ/openhexa-frontend): the **Frontend component**, a React/NextJS application that contains the user-facing part of OpenHexa
+- [BLSQ/openhexa-notebooks](https://github.com/BLSQ/openhexa-notebooks): the **Notebooks component**, a customized [JupyterHub](https://jupyter.org/hub) setup
+- [BLSQ/openhexa-pipelines](https://github.com/BLSQ/openhexa-pipelines): the **Pipelines component**, a series of data pipelines running on [Airflow](https://airflow.apache.org/)
 
 <div align="center">
    <img alt="OpenHexa Architecture" src="https://raw.githubusercontent.com/BLSQ/openhexa/main/visuals/architecture.png">
