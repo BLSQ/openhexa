@@ -25,8 +25,18 @@ You can find more information about OpenHexa on the [project page](https://www.b
 
 Please note that this repository **does not contain any code**: it is a starting point for OpenHexa users and implementers.
 
+Main use cases
+--------------
+
+The main use case of OpenHexa is to support a health data science / analysis project from start to finish:
+
+- A user can browse and search data from different sources (DHIS2, relational databases, flat files, climate data) in the catalog
+- The user is then able to write a notebook that interacts with the data and share it with her colleagues
+- Once the exploratory analysis is completed, the user can productivize the data processing by creating and deploying a pipeline
+- The user can finally connect third-party visualization tools such as Tableau or Apache Superset to the data processed in OpenHexa
+
 Roadmap and issues
-==================
+------------------
 
 You can find the publid roadmap [here](https://github.com/orgs/BLSQ/projects/3).
 
