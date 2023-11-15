@@ -21,8 +21,9 @@ The actions that a user can take within a workspace is determined by its role. T
 | Read files                   | x       | x       | x      |
 | Write files                  | -       | x       | x      |
 | View database content        | x       | x       | x      |
+| View database credentials    | -       | x       | x      |
 | Write to database            | -       | x       | x      |
-| Regenerate database password | -       | x       | x      |
+| Regenerate database password | -       | -       | x      |
 | Read datasets                | x       | x       | x      |
 | Write datasets               | -       | x       | x      |
 | Use connections              | -       | x       | x      |
