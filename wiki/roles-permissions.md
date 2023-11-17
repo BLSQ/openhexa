@@ -1,6 +1,8 @@
 ## Roles and permissions
 
-The actions that a user can take within a workspace is determined by its role. The following table summarizes the permissions for each role:
+The actions that a user can take within a workspace is determined by their role. 
+
+The following table summarizes the permissions for each role:
 
 | Features                     | Viewers | Editors | Admins |
 |------------------------------|---------|---------|--------|
