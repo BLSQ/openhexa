@@ -1,18 +1,18 @@
 <div align="center">
-   <img alt="OpenHexa Logo" src="https://raw.githubusercontent.com/BLSQ/openhexa-app/main/hexa/static/img/logo/logo_with_text_grey.svg" height="80">
+   <img alt="OpenHEXA Logo" src="https://raw.githubusercontent.com/BLSQ/openhexa-app/main/hexa/static/img/logo/logo_with_text_grey.svg" height="80">
 </div>
 <p align="center">
     <em>Open-source Data integration platform</em>
 </p>
 
-OpenHexa
+OpenHEXA
 ========
 
-OpenHexa is an open-source data integration platform developed by [Bluesquare](https://bluesquarehub.com).
+OpenHEXA is an open-source data integration platform developed by [Bluesquare](https://bluesquarehub.com).
 
 Its goal is to facilitate data integration and analysis workflows, in particular in the context of public health projects.
 
-OpenHexa allows you to:
+OpenHEXA allows you to:
 
 1. Create **workspaces** to group code, data and users
 2. Upload and read files from a **shared filesystem**
@@ -23,12 +23,12 @@ OpenHexa allows you to:
 
 <img width="1363" alt="Workspace homepage" src="https://github.com/BLSQ/openhexa/assets/690667/22a94409-8360-4e69-8a55-c40f71fc5246">
 
-Please note that this repository **does not contain any code**: it is a starting point for OpenHexa users and implementers.
+Please note that this repository **does not contain any code**: it is a starting point for OpenHEXA users and implementers.
 
 Documentation
 -------------
 
-The OpenHexa documentation lives in our [wiki](https://github.com/BLSQ/openhexa/wiki).
+The OpenHEXA documentation lives in our [wiki](https://github.com/BLSQ/openhexa/wiki).
 
 To get started, you might be interested in the following pages:
 
