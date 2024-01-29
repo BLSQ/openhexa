@@ -23,7 +23,7 @@ OpenHEXA allows you to:
 
 <img width="1363" alt="Workspace homepage" src="https://github.com/BLSQ/openhexa/assets/690667/22a94409-8360-4e69-8a55-c40f71fc5246">
 
-Please note that this repository **does not contain any code**: it is a starting point for OpenHEXA users and implementers.
+Please note that this repository **does not contain any code**: it is a starting point for OpenHEXA users and implementers. Please refer to the [technical architecture](https://github.com/BLSQ/openhexa/wiki/Technical-architecture) page of our wiki for more information about the different OpenHEXA components, including the links to the relevant GitHub repositories.
 
 Documentation
 -------------
