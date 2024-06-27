@@ -70,7 +70,7 @@ services:
       - POSTGRES_USER=hexa-app
       - POSTGRES_PASSWORD=hexa-app
     ports:
-      - "5434:5432"
+      - "${DB_PORT:-5434}:5432"
 
   app:
     # Inherit from the block defined on top and override some fields
@@ -79,18 +79,9 @@ services:
     restart: unless-stopped
     container_name: app
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     depends_on:
       - db
-
-  # dataworker:
-  #   <<: *common
-  #   command: "manage validate_fileset_worker"
-  #   restart: unless-stopped
-  #   profiles:
-  #     - "dataworker"
-  #   depends_on:
-  #     - db
   
   frontend:
     image: "blsq/openhexa-frontend:${FRONTEND_VERSION:-main}"
@@ -99,7 +90,7 @@ services:
       - openhexa
     container_name: frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - OPENHEXA_BACKEND_URL=http://app:8000
     profiles:
@@ -140,8 +131,8 @@ services:
     profiles:
       - minio
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     networks:
       - openhexa
     environment:

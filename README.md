@@ -64,3 +64,24 @@ Finally, you can run openhexa with
 ```bash
 docker compose --profile frontend --profile minio --profile pipelines up
 ```
+
+### Debian Package
+
+#### Build
+
+```bash
+dhclean
+debuild -us -uc
+```
+
+#### Install
+
+```bash
+sudo dpkg -i openhexa_1.0-1.deb
+```
+
+It installs the systemd service `openhexa`, that you can manage with `systemctl`.
+
+#### Configure
+
+You can change some config via the file `/etc/openhexa/env.conf`.

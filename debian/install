@@ -1,0 +1,2 @@
+.env.dist etc/openhexa
+compose.yml	usr/share/openhexa
