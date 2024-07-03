@@ -44,3 +44,44 @@ Please report bugs in the issues section of this repository: https://github.com/
 
 Feel free to reach out in the [discussions section](https://github.com/BLSQ/openhexa/discussions) if you have 
 questions or suggestions!
+
+Quick Start
+-----------
+
+Requirements:
+- a least docker 26.1
+- Debian bookworm
+
+Set some secrets in `.env` by copying the `.env.dist` to `.env`. Then you can
+prepare the database and environment with
+
+```bash
+docker compose --profile frontend --profile minio --profile pipelines run app fixtures
+```
+
+Finally, you can run openhexa with
+
+```bash
+docker compose --profile frontend --profile minio --profile pipelines up
+```
+
+### Debian Package
+
+#### Build
+
+```bash
+dhclean
+debuild -us -uc
+```
+
+#### Install
+
+```bash
+sudo dpkg -i openhexa_1.0-1.deb
+```
+
+It installs the systemd service `openhexa`, that you can manage with `systemctl`.
+
+#### Configure
+
+You can change some config via the file `/etc/openhexa/env.conf`.

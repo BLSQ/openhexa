@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+
+case "$1" in
+remove)
+  echo "No additional configuration to remove"
+  ;;
+purge)
+  [[ -r /etc/openhexa/env.conf ]] && rm /etc/openhexa/env.conf
+  ;;
+
+\
+  *)
+  echo "postrm called with unknown argument \`$1'" >&2
+  exit 0
+  ;;
+esac
+
+#DEBHELPER#
+
+exit 0

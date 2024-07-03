@@ -1,0 +1,3 @@
+tar-ignore = ".env"
+tar-ignore = ".git"
+tar-ignore = "visuals"
