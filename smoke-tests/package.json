@@ -1,0 +1,20 @@
+{
+  "name": "smoke-tests",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:codegen": "playwright codegen"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@playwright/test": "^1.45.1",
+    "@types/node": "^20.14.9"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}
