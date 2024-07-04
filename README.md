@@ -56,13 +56,13 @@ Set some secrets in `.env` by copying the `.env.dist` to `.env`. Then you can
 prepare the database and environment with
 
 ```bash
-docker compose --profile frontend --profile minio --profile pipelines run app fixtures
+docker compose run app fixtures
 ```
 
 Finally, you can run openhexa with
 
 ```bash
-docker compose --profile frontend --profile minio --profile pipelines up
+docker compose --profile frontend --profile minio --profile  pipelines --profile notebook up
 ```
 
 ### Debian Package
@@ -85,3 +85,12 @@ It installs the systemd service `openhexa`, that you can manage with `systemctl`
 #### Configure
 
 You can change some config via the file `/etc/openhexa/env.conf`.
+
+#### Test
+
+You can use [`act`](https://nektosact.com/) to run locally the Github Actions
+workflows.
+
+```bash
+act --action-offline-mode push
+```

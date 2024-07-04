@@ -1,0 +1,54 @@
+name: build_debian_package
+run-name: ${{ github.actor }} is packaging for Debian
+on: [push]
+jobs:
+  package:
+    name: Build Debian package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install devscripts
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends devscripts debhelper build-essential openssl
+
+      - name: Build package
+        run: |
+          dh_clean
+          debuild -us -uc
+          cp ../openhexa_*_amd64.deb .
+
+      - name: Keep package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian_package_amd64
+          path: openhexa_*_amd64.deb
+
+  install:
+    name: Install Debian package
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Retrieve package
+        uses: actions/download-artifact@v4
+        with:
+          name: debian_package_amd64
+
+      - name: Install package and test it
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends gettext-base
+          sudo dpkg -i openhexa_*_amd64.deb
+          for expected_file in /lib/systemd/system/openhexa.service /etc/openhexa/env.conf /usr/share/openhexa/compose.yml; do
+            [[ -r $expected_file ]] || { echo "The file ${expected_file} hasn't been installed"; exit 1;}
+          done
+          docker ps
+          command=$(grep ExecStart /lib/systemd/system/openhexa.service | sed -e "s/ExecStart=//" -e "s/up.*//" -e "s/\/usr\/bin\/docker/docker/")
+          ${command} up --wait --wait-timeout 60
+          number_of_running_services=$(${command} ps --status running --quiet | wc -l)
+          ((number_of_running_services == 8)) || { echo "Not all 8 services are running"; exit 1; }
+          docker run -it --net=host openhexa-smoke-tests http://localhost:3000/ root@openhexa.org root
