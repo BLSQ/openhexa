@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({page}) => {
   // @ts-ignore
-  await page.goto(process.env.OH_BASE_URL);
+  await page.goto(process.env.OPENHEXA_BASE_URL);
   await login(page)
 })
 
@@ -13,8 +13,8 @@ test.beforeEach(async ({page}) => {
 async function login(page) {
   // Login
   await page.goto("/login")
-  await page.getByPlaceholder('Email address').fill(process.env.OH_USERNAME);
-  await page.getByPlaceholder('Password').fill(process.env.OH_PASSWORD);
+  await page.getByPlaceholder('Email address').fill(process.env.OPENHEXA_USERNAME);
+  await page.getByPlaceholder('Password').fill(process.env.OPENHEXA_PASSWORD);
   await page.getByRole('button', {name: "Sign in"}).click({ force: true });
   await expect(page.getByText(/Where to go from here?/)).toBeVisible();
 }

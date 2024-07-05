@@ -7,15 +7,24 @@
 docker build -t smoke-tests .
 ```
 
-2. Run the docker container:
+2. Replace the necessary values in the command below and run the tests:
 ```bash
-docker run  -it -v "$(pwd):/usr/src/app" smoke-tests
+docker run  -it --net=host smoke-tests <URL> <username> <password>
+```
+
+If you want to mount the tests directory to the container, you can use the following command:
+```bash
+docker run  -it --net=host -v "$(pwd)/tests":/code/tests smoke-tests <URL> <username> <password>
 ```
 
 ## How to run smoke tests without docker
+
+You have to have node.js installed on your machine. The minimum version required is 20.
+
 1. Install the dependencies:
 ```bash
 npm install
+npx playwright install # Install Playwright configured browsers & deps
 ```
 
 2. Configure the environment variables:

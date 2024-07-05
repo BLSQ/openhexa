@@ -2,14 +2,15 @@ FROM mcr.microsoft.com/playwright:v1.45.0-jammy
 
 
 # Set the working directory
-WORKDIR /usr/src/app
+WORKDIR /code
 
 # Copy your project files into the Docker container
-COPY . .
+COPY package.json package-lock.json /code/
+RUN npm install -y && npx playwright install
 
-# Install deps
-RUN npm install
+COPY entrypoint.sh playwright.config.js /code/
 
+COPY tests /code/tests
 
 # Run Playwright tests
-CMD ["npx", "playwright", "test"]
+ENTRYPOINT ["/code/entrypoint.sh"]
