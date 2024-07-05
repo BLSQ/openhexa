@@ -70,7 +70,7 @@ docker compose --profile frontend --profile minio --profile pipelines up
 #### Build
 
 ```bash
-dhclean
+dh_clean
 debuild -us -uc
 ```
 
