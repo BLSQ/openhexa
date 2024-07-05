@@ -1,5 +1,18 @@
 # Smoke tests
-## How to run smoke tests
+
+## How to run smoke tests with docker
+
+1. Build the docker image:
+```bash
+docker build -t smoke-tests .
+```
+
+2. Run the docker container:
+```bash
+docker run  -it -v "$(pwd):/usr/src/app" smoke-tests
+```
+
+## How to run smoke tests without docker
 1. Install the dependencies:
 ```bash
 npm install
