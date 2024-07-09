@@ -20,43 +20,24 @@ x-app: &common
       - NEW_FRONTEND_DOMAIN=localhost:3000
       - PIPELINE_SCHEDULER_SPAWNER=docker
       - PIPELINE_API_URL=http://app:8000
-      # - DEFAULT_WORKSPACE_IMAGE
-      # The following variables are optional and can be set in your local .env file for testing purposes
       - DEBUG_LOGGING=${DEBUG_LOGGING}
       - DEBUG_TOOLBAR=${DEBUG_TOOLBAR}
-      # - EMAIL_HOST
-      # - EMAIL_PORT
-      # - EMAIL_HOST_USER
-      # - EMAIL_USE_TLS
-      # - EMAIL_HOST_PASSWORD
       - WORKSPACES_DATABASE_ROLE=hexa-app
       - WORKSPACES_DATABASE_PASSWORD=hexa-app
       - WORKSPACES_DATABASE_HOST=db
       - WORKSPACES_DATABASE_PORT=5432
       - WORKSPACES_DATABASE_DEFAULT_DB=hexa-app
       - WORKSPACES_DATABASE_PROXY_HOST=db
-      # - WORKSPACE_DATASETS_BUCKET
-      # - WORKSPACE_BUCKET_VERSIONING_ENABLED
       - WORKSPACE_STORAGE_ENGINE_AWS_ENDPOINT_URL=http://minio:9000
-      # - WORKSPACE_STORAGE_ENGINE_AWS_PUBLIC_ENDPOINT_URL
       - WORKSPACE_STORAGE_ENGINE=s3
       - WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID=${WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID}
       - WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY=${WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY}
-      # - WORKSPACE_STORAGE_ENGINE_AWS_BUCKET_REGION           
+      - WORKSPACE_STORAGE_ENGINE_AWS_BUCKET_REGION=europe-west1
       - NOTEBOOKS_HUB_URL=http://jupyterhub:8000/hub
       - HUB_API_TOKEN=cbb352d6a412e266d7494fb014dd699373645ec8d353e00c7aa9dc79ca87800d
-      # - GCS_SERVICE_ACCOUNT_KEY
       - WORKSPACE_BUCKET_PREFIX=hexa-test-
       - WORKSPACE_BUCKET_REGION=europe-west1
-      # - AWS_USERNAME
-      # - AWS_ACCESS_KEY_ID
-      # - AWS_SECRET_ACCESS_KEY
-      # - AWS_ENDPOINT_URL
-      # - AWS_DEFAULT_REGION
-      # - AWS_USER_ARN
-      # - AWS_APP_ROLE_ARN
-      # - AWS_PERMISSIONS_BOUNDARY_POLICY_ARN
-    
+      - DEFAULT_WORKSPACE_IMAGE=blsq/openhexa-base-environment
 
 services:
   db:
@@ -139,6 +120,48 @@ services:
       - MINIO_ROOT_USER=${WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID}
       - MINIO_ROOT_PASSWORD=${WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY}
 
+  jupyter:
+    image: blsq/openhexa-base-environment
+    platform: linux/amd64
+    command: echo
+
+  jupyterhub:
+    platform: linux/amd64
+    image: blsq/openhexa-jupyterhub
+    command: ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_dev_config.py"]
+    container_name: jupyterhub
+    networks:
+      - openhexa
+    depends_on:
+      - db-hub
+    environment:
+      LOAD_DEV_CONFIG: "true"
+      JUPYTER_IMAGE: blsq/openhexa-base-environment
+      DOCKER_NETWORK_NAME: openhexa
+      HUB_IP: jupyterhub
+      HUB_DB_URL: postgresql://postgres:postgres@db-hub:5432/jupyterhub
+      AUTHENTICATION_URL: http://app:8000/notebooks/authenticate/
+      DEFAULT_CREDENTIALS_URL: http://app:8000/notebooks/default-credentials/
+      WORKSPACE_CREDENTIALS_URL: http://app:8000/workspaces/credentials/
+      LOGOUT_REDIRECT_URL: http://app:8000/
+      HEXA_SERVER_URL: http://app:8000/
+      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' localhost:*"
+      JUPYTERHUB_CRYPT_KEY: 0b9c2791baa0b19e10f1dc9c4a1a702dda0a37c332378870e9542271a365b9b8
+      HUB_API_TOKEN: cbb352d6a412e266d7494fb014dd699373645ec8d353e00c7aa9dc79ca87800d
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - ${JUPYTERHUB_PORT:-8001}:8000
+    restart: on-failure
+
+  db-hub:
+    image: postgres:12
+    networks:
+      - openhexa
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jupyterhub
 
 networks:
   openhexa:
