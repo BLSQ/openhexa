@@ -2,17 +2,6 @@
 
 set -e
 
-docker_compose_cmd="docker compose \
-    --file /usr/share/openhexa/compose.yml \
-    --env-file /etc/openhexa/env.conf \
-    --project-name openhexa "
-
-running_profiles="--profile frontend \
-    --profile minio \
-    --profile pipelines \
-    --profile notebook "
-all_profiles="${running_profiles} --profile spwaned-notebook"
-
 case "$1" in
 configure)
   [[ ! -r /etc/openhexa/env.conf ]] && (
@@ -27,10 +16,8 @@ configure)
       envsubst </etc/openhexa/.env.dist >/etc/openhexa/env.conf
   )
 
-  # shellcheck disable=SC2086
-  $docker_compose_cmd $all_profiles pull --policy always
-
-  $docker_compose_cmd run app fixtures
+  /usr/share/openhexa/openhexa.sh -g update
+  /usr/share/openhexa/openhexa.sh -g prepare
   ;;
 
 \

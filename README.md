@@ -56,13 +56,13 @@ Set some secrets in `.env` by copying the `.env.dist` to `.env`. Then you can
 prepare the database and environment with
 
 ```bash
-docker compose run app fixtures
+./script/openhexa.sh prepare
 ```
 
 Finally, you can run openhexa with
 
 ```bash
-docker compose --profile frontend --profile minio --profile  pipelines --profile notebook up
+./script/openhexa.sh start
 ```
 
 ### Debian Package
@@ -70,8 +70,7 @@ docker compose --profile frontend --profile minio --profile  pipelines --profile
 #### Build
 
 ```bash
-dh_clean
-debuild -us -uc
+./script/build.sh
 ```
 
 #### Install
