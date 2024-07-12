@@ -34,10 +34,14 @@ module.exports = defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    
+    {
+      name: 'setup',
+      testMatch: /global\.setup\.ts/,
+    },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
+      dependencies: ['setup'],
     },
 
     // {
