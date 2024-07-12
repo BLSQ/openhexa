@@ -41,7 +41,7 @@ jobs:
         with:
           name: debian_package_amd64
 
-      - name: Install package and test it
+      - name: Install package & Run OpenHEXA
         run: |
           sudo apt update
           sudo apt install -y --no-install-recommends gettext-base
@@ -55,6 +55,9 @@ jobs:
           (( $(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ready/) == 200 )) || { echo "The HTTP request to the frontend fails"; exit 1; }
           (( $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready) == 200 )) || { echo "The HTTP request to the backend fails"; exit 1; }
           docker ps
+          
+      - name: Build & Run smoke tests
+        run: |
           (cd smoke-tests;docker build -t smoke-tests .;)
           sleep 5
           docker run -t --net=host curlimages/curl:8.8.0 -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready
