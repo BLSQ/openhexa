@@ -20,6 +20,13 @@ If you want to mount the tests directory to the container, you can use the follo
 docker run  -it --net=host -v "$(pwd)/tests":/code/tests smoke-tests <URL> <username> <password>
 ```
 
+If you want to get the test results and the failure screenshot, you can use the
+following one:
+
+```bash
+docker run  -it --net=host -v "$(pwd)/test-results:/code/test-results" smoke-tests <URL> <username> <password>
+```
+
 ## How to run smoke tests without docker
 
 You have to have node.js installed on your machine. The minimum version required is 20.
