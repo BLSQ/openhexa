@@ -1,3 +1,5 @@
 tar-ignore = ".env"
 tar-ignore = ".git"
 tar-ignore = "visuals"
+tar-ignore = ".github"
+tar-ignore = "script"

@@ -5,22 +5,19 @@ set -e
 case "$1" in
 configure)
   [[ ! -r /etc/openhexa/env.conf ]] && (
-    last_pgsql_port=$(pg_lsclusters --no-header | sed -e "s/[[:space:]]\+/,/g" | cut -d, -f3 | sort | uniq | tail -1)
+    db_port=5432
+    if [[ -x /usr/bin/pg_lsclusters ]]; then
+      last_pgsql_port=$(pg_lsclusters --no-header | sed -e "s/[[:space:]]\+/,/g" | cut -d, -f3 | sort | uniq | tail -1)
+      db_port=$((last_pgsql_port + 1))
+    fi
     AWS_ACCESS_KEY_ID=$(openssl rand -hex 16) \
     AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 42) \
-    DB_PORT=$((last_pgsql_port + 1)) \
+    DB_PORT=$db_port \
       envsubst </etc/openhexa/.env.dist >/etc/openhexa/env.conf
   )
 
-  docker compose \
-    --file /usr/share/openhexa/compose.yml \
-    --env-file /etc/openhexa/env.conf \
-    --project-name openhexa \
-    --profile frontend \
-    --profile minio \
-    --profile pipelines \
-    pull --policy always
-
+  /usr/share/openhexa/openhexa.sh -g update
+  /usr/share/openhexa/openhexa.sh -g prepare
   ;;
 
 \

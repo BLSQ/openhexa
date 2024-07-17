@@ -3,13 +3,14 @@ Description=%i service
 PartOf=docker.service network-online.target
 After=docker.service network-online.target
 AssertPathExists=/usr/share/openhexa/compose.yml
+Documentation=https://github.com/BLSQ/openhexa
 
 [Service]
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=/etc/openhexa
-ExecStart=/usr/bin/docker compose --file /usr/share/openhexa/compose.yml --env-file /etc/openhexa/env.conf --project-name openhexa --profile frontend --profile minio --profile pipelines up -d --remove-orphans
-ExecStop=/usr/bin/docker compose --file /usr/share/openhexa/compose.yml --env-file /etc/openhexa/env.conf --project-name openhexa stop
+ExecStart=/usr/share/openhexa/openhexa.sh -g start
+ExecStop=/usr/share/openhexa/openhexa.sh -g stop
 
 [Install]
 WantedBy=multi-user.target
