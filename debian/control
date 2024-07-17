@@ -3,10 +3,10 @@ Maintainer: Christophe Philemotte <cphilemotte@bluesquarehub.com>
 Section: misc
 Priority: optional
 Standards-Version: 4.6.2
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 13), git
 
 Package: openhexa
 Architecture: amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${docker:Depends}, gettext-base
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${docker:Depends}, gettext-base, openssl, postgresql, postgresql-postgis
 Description: Systemd Service for OpenHexa
  This installs a systemd service to run a containerized openhexa locally.

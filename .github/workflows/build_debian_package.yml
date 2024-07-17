@@ -5,15 +5,31 @@ jobs:
   package:
     name: Build Debian package
     runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
 
     steps:
+      - name: Update APT database
+        run: apt update
+
+      - name: Obtain Latest Git ONLY within container for checkout
+        run: apt install -y --no-install-recommends git ca-certificates
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install devscripts
+      - name: Make the working directory safe for Git if run in GitHub runner container
+        run: git config --system --add safe.directory "$PWD"
+
+      - name: Hack container for local development
+        if: ${{ env.ACT }}
         run: |
-          sudo apt update
-          sudo apt install -y --no-install-recommends devscripts debhelper build-essential openssl
+          apt install -y --no-install-recommends curl
+          curl -fsSL https://deb.nodesource.com/setup_18.x | su -p -c bash -
+          apt install -y nodejs
+
+      - name: Install devscripts
+        run: apt install -y --no-install-recommends devscripts debhelper build-essential
 
       - name: Build package
         run: |
@@ -31,35 +47,111 @@ jobs:
     needs:
       - package
     runs-on: ubuntu-latest
+    # Unfortunately, the postgresql running in the job container can't bind
+    # the docker0 interface as it is not mounted inside the job container.
+    # container:
+    #   image: debian:bookworm
+    #   options: '--privileged'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Update APT database
+        run: sudo apt update
+
+      - name: Install curl and CA certificates
+        run: sudo apt install -y --no-install-recommends curl ca-certificates
+
+      # this is for job container
+      # - name: Hack container for local development
+      #   if: ${{ env.ACT }}
+      #   run: |
+      #     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo su -p -c bash -
+      #     sudo apt install -y nodejs npm
+      #     curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+      #     sudo sh /tmp/get-docker.sh
 
       - name: Retrieve package
         uses: actions/download-artifact@v4
         with:
           name: debian_package_amd64
 
-      - name: Install package & Run OpenHEXA
+      # on Debian bookworkm we can simply install postgresql-postgis, but
+      # because it triggers a restart of another package, we need to be more
+      # specific
+      - name: Install OpenHexa dependencies
         run: |
-          sudo apt update
-          sudo apt install -y --no-install-recommends gettext-base
+          sudo apt install -y --no-install-recommends gettext-base openssl postgresql postgresql-postgis
+          curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq &&\
+              sudo mv /tmp/yq /usr/bin/yq &&\
+              sudo chmod +x /usr/bin/yq
+
+      - name: Start PostgreSQL if run locally
+        if: ${{ env.ACT }}
+        run: |
+          sudo /etc/init.d/postgresql restart
+      - name: Start PostgreSQL if run on GitHub runner
+        if: ${{ ! env.ACT }}
+        run: |
+          sudo systemctl restart postgresql
+
+      - name: Install OpenHexa
+        run: |
           sudo dpkg -i openhexa_*_amd64.deb
-          for expected_file in /lib/systemd/system/openhexa.service /etc/openhexa/env.conf /usr/share/openhexa/compose.yml /usr/share/openhexa/openhexa.sh; do
-            [[ -r $expected_file ]] || { echo "The file ${expected_file} hasn't been installed"; exit 1;}
-          done
-          docker ps
-          [[ $ACT == "true" ]] && /usr/share/openhexa/openhexa.sh -g start
-          [[ $(/usr/share/openhexa/openhexa.sh -g status) == "Running" ]] || { echo "Not all 8 services are running"; /usr/share/openhexa/openhexa.sh -g ps; exit 1; }
-          (( $(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ready/) == 200 )) || { echo "The HTTP request to the frontend fails"; exit 1; }
-          (( $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready) == 200 )) || { echo "The HTTP request to the backend fails"; exit 1; }
-          docker ps
-      - name: Install dependencies
+          /usr/share/openhexa/setup.sh -g check
+
+      - name: Start OpenHexa if run locally
+        if: ${{ env.ACT }}
+        run: /usr/share/openhexa/openhexa.sh -g start
+      - name: Get OpenHexa status
+        run: /usr/share/openhexa/openhexa.sh -g status
+
+      - name: Install smoke tests dependencies
         working-directory: ./smoke-tests
         run: npm ci
+
       - name: Build smoke tests image
         working-directory: ./smoke-tests
         run: docker build -t openhexa/smoke-tests .
       - name: Run smoke tests
-        run: docker run -t --net=host openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root || echo fail
+        run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
+      - name: Keep test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smoke tests results
+          path: smoke-test-results/
+
+
+      - name: Stop OpenHexa
+        run: /usr/share/openhexa/openhexa.sh -g stop
+
+      - name: Remove and purge package
+        run: sudo apt purge -y openhexa
+
+  # WIP
+  # create_repo_and_publish:
+  #   name: Create APT repo and publish on GitHub Pages
+  #   needs:
+  #     -install
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: debian:bookworm
+  #   outputs:
+  #     artifact_id: ${{ steps.upload-artifact.outputs.artifact-id }}
+  #     keyring: ${{ steps.create-apt-repo.outputs.keyring }}
+  #   steps:
+  #     - name: Retrieve package
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: debian_package_amd64
+  #     - uses: morph027/apt-repo-action@v2
+  #             id: create-apt-repo
+  #             with:
+  #               repo-name: ${{ env.REPO_NAME }}
+  #               signing-key: ${{ secrets.SIGNING_KEY }}
+  #           - name: Upload Pages artifact
+  #             uses: actions/upload-pages-artifact@v3
+  #             with:
+  #               name: github-pages
+  #               path: ${{ steps.create-apt-repo.outputs.dir }}

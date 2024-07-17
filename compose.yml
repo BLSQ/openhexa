@@ -4,17 +4,16 @@ x-app: &common
     platform: linux/amd64
     networks:
       - openhexa
+    extra_hosts:
+      db: host-gateway
     environment:
       - DEBUG=true
       - DJANGO_SETTINGS_MODULE=config.settings.dev
       - DATABASE_HOST=db
-      - DATABASE_PORT=5432
+      - DATABASE_PORT=${DB_PORT:-5432}
       - DATABASE_NAME=hexa-app
       - DATABASE_USER=hexa-app
       - DATABASE_PASSWORD=hexa-app
-      - ACCESSMOD_BUCKET_NAME=s3://hexa-demo-accessmod
-      - ACCESSMOD_MANAGE_REQUESTS_URL=http://localhost:3000/admin/access-requests
-      - ACCESSMOD_SET_PASSWORD_URL=http://localhost:3000/account/set-password
       - NEW_FRONTEND_DOMAIN=localhost:3000
       - PIPELINE_SCHEDULER_SPAWNER=docker
       - PIPELINE_API_URL=http://app:8000
@@ -23,7 +22,7 @@ x-app: &common
       - WORKSPACES_DATABASE_ROLE=hexa-app
       - WORKSPACES_DATABASE_PASSWORD=hexa-app
       - WORKSPACES_DATABASE_HOST=db
-      - WORKSPACES_DATABASE_PORT=5432
+      - WORKSPACES_DATABASE_PORT=${DB_PORT:-5432}
       - WORKSPACES_DATABASE_DEFAULT_DB=hexa-app
       - WORKSPACES_DATABASE_PROXY_HOST=db
       - WORKSPACE_STORAGE_ENGINE_AWS_ENDPOINT_URL=http://minio:9000
@@ -38,24 +37,6 @@ x-app: &common
       - DEFAULT_WORKSPACE_IMAGE=blsq/openhexa-base-environment
 
 services:
-  db:
-    image: postgis/postgis:12-3.2
-    networks:
-      - openhexa
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=hexa-app
-      - POSTGRES_USER=hexa-app
-      - POSTGRES_PASSWORD=hexa-app
-    ports:
-      - "${DB_PORT:-5434}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   app:
     # Inherit from the block defined on top and override some fields
     <<: *common
@@ -64,8 +45,6 @@ services:
     container_name: app
     ports:
       - "${APP_PORT:-8000}:8000"
-    depends_on:
-      - db
     healthcheck:
       test: curl "http://localhost:8000/ready" || exit 1
       interval: "60s"
@@ -101,9 +80,7 @@ services:
     restart: unless-stopped
     profiles:
       - "pipelines"
-    depends_on:
-      - db
-    volumes:  # only used for Github Codespaces
+    volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: \[ $(ps -p $(pgrep "python") -o etimes | tail -n +2) -gt 14 \]
@@ -122,8 +99,6 @@ services:
     restart: unless-stopped
     profiles:
       - "pipelines"
-    depends_on:
-      - db
     healthcheck:
       test: \[ $(ps -p $(pgrep "python") -o etimes | tail -n +2) -gt 14 \]
       interval: "60s"
@@ -157,7 +132,7 @@ services:
     platform: linux/amd64
     command: echo
     profiles:
-      - spwaned-notebook
+      - spawned-notebook
 
   jupyterhub:
     platform: linux/amd64
@@ -166,8 +141,6 @@ services:
     container_name: jupyterhub
     networks:
       - openhexa
-    depends_on:
-      - db-hub
     profiles:
       - notebook
     environment:
@@ -175,7 +148,7 @@ services:
       JUPYTER_IMAGE: blsq/openhexa-base-environment
       DOCKER_NETWORK_NAME: openhexa
       HUB_IP: jupyterhub
-      HUB_DB_URL: postgresql://postgres:postgres@db-hub:5432/jupyterhub
+      HUB_DB_URL: postgresql://hexa-hub:hexa-hub@host.docker.internal:${DB_PORT:-5432}/hexa-hub
       AUTHENTICATION_URL: http://app:8000/notebooks/authenticate/
       DEFAULT_CREDENTIALS_URL: http://app:8000/notebooks/default-credentials/
       WORKSPACE_CREDENTIALS_URL: http://app:8000/workspaces/credentials/
@@ -188,6 +161,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - ${JUPYTERHUB_PORT:-8001}:8000
+    extra_hosts:
+      host.docker.internal: host-gateway
     restart: on-failure
     healthcheck:
       test: curl "http://localhost:8000/health" || exit 1
@@ -196,25 +171,10 @@ services:
       start_period: "5s"
       retries: 3
 
-  db-hub:
-    image: postgres:12
-    profiles:
-      - notebook
-    networks:
-      - openhexa
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: jupyterhub
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 networks:
   openhexa:
     name: openhexa
 volumes:
   pgdata:
   minio_data:
+

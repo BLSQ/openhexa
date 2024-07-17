@@ -11,14 +11,24 @@ docker build -t smoke-tests .
 2. Replace the necessary values in the command below and run the tests:
 
 ```bash
-docker run  -it --net=host smoke-tests <URL> <username> <password>
+docker run -it --net=host smoke-tests <URL> <username> <password>
 ```
 
 If you want to mount the tests directory to the container, you can use the following command:
 
 ```bash
-docker run  -it --net=host -v "$(pwd)/tests":/code/tests smoke-tests <URL> <username> <password>
+docker run -it --net=host -v "$(pwd)/tests":/code/tests smoke-tests <URL> <username> <password>
 ```
+
+If you want to get the test results and the failure screenshot, you can use the
+following one:
+
+```bash
+docker run -it --net=host -v "$(pwd)/test-results:/code/test-results" smoke-tests <URL> <username> <password>
+```
+
+You can look at the traces with the
+[online Playwright trace viewer](https://trace.playwright.dev/).
 
 ## How to run smoke tests without docker
 
