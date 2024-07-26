@@ -19,12 +19,11 @@ export OPENHEXA_PASSWORD
 # Navigate to the directory containing the tests
 cd /code
 
-
 # Print the environment
 echo "Launching smoke tests on $OPENHEXA_BASE_URL..."
 
 # Run the Playwright tests
-npx playwright test
+npx playwright test --trace on
 
 # Capture the exit status of the tests
 EXIT_STATUS=$?

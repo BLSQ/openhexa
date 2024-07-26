@@ -1,34 +1,13 @@
 #!/bin/bash
 
+# script/openhexa.sh: command OpenHexa service
+
 OPTION_GLOBAL="off"
 COMMAND="help"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-COMPOSE_FILE_PATH="compose.yml"
-CONFIG_FILE_PATH=".env"
-
-function setup() {
-  if [[ $OPTION_GLOBAL == "on" ]]; then
-    COMPOSE_FILE_PATH="/usr/share/openhexa/compose.yml"
-    CONFIG_FILE_PATH="/etc/openhexa/env.conf"
-  fi
-}
-
-function run_compose() {
-  docker compose \
-    --file "${COMPOSE_FILE_PATH}" \
-    --env-file "${CONFIG_FILE_PATH}" \
-    --project-name openhexa \
-    $@
-}
-
-function run_compose_with_profiles() {
-  run_compose \
-    --profile frontend \
-    --profile minio \
-    --profile pipelines \
-    --profile notebook \
-    $@
-}
+# shellcheck source=script/common_functions.sh
+source "${SCRIPT_DIR}/common_functions.sh"
 
 function usage() {
   echo """
@@ -55,22 +34,30 @@ function usage() {
   """
 }
 
-function parse_commandline() {
-  while getopts "g" flag; do
-    case "${flag}" in
-    g)
-      OPTION_GLOBAL="on"
-      ;;
-    *) ;;
-    esac
-  done
-  shift $((OPTIND - 1))
-  [[ -n $1 ]] && COMMAND="$1"
+function number_of_services() {
+  local service_to_exclude="jupyter"
+  yq ".services | keys | map(select(. != \"${service_to_exclude}\")) | length" "${COMPOSE_FILE_PATH}"
+}
+
+function number_of_running_services() {
+  run_compose_with_profiles ps --status running --quiet | wc -l
+}
+
+function is_all_services_running() {
+  (($(number_of_services) == $(number_of_running_services)))
+}
+
+function is_frontend_reachable() {
+  (($(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ready/) == 200))
+}
+
+function is_backend_reachable() {
+  (($(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready) == 200))
 }
 
 function execute() {
-  local nbr_of_healthy_services
   local command=$1
+  local exit_code=0
   case "${command}" in
   start)
     run_compose_with_profiles up --wait --wait-timeout 60 --remove-orphans
@@ -81,21 +68,35 @@ function execute() {
     exit 0
     ;;
   status)
-    number_of_running_services=$(run_compose_with_profiles ps --status running --quiet | wc -l)
-    if ((number_of_running_services == 8)); then
-      echo "Running"
-      exit 0
+    echo -n "Running: "
+    if is_all_services_running; then
+      echo "All $(number_of_services)"
     else
-      echo "Only ${number_of_running_services} services are running"
-      exit 0
+      echo "Only $(number_of_running_services) of the $(number_of_services) services are running"
+      exit_code=1
     fi
+    echo -n "Frontend HTTP Reachable: "
+    if is_frontend_reachable; then
+      echo "Yes"
+    else
+      echo "No"
+      exit_code=1
+    fi
+    echo -n "Backend HTTP Reachable: "
+    if is_backend_reachable; then
+      echo "Yes"
+    else
+      echo "No"
+      exit_code=1
+    fi
+    exit $exit_code
     ;;
   ps)
     run_compose_with_profiles ps
     exit 0
     ;;
   update)
-    run_compose_with_profiles --profile spwaned-notebook pull --policy always
+    run_compose_with_profiles --profile spawned-notebook pull --policy always
     exit 0
     ;;
   prepare)
