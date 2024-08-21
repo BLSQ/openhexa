@@ -4,8 +4,7 @@ set -e
 
 case "$1" in
 configure)
-  /usr/share/openhexa/setup.sh -g env
-  /usr/share/openhexa/setup.sh -g db
+  /usr/share/openhexa/setup.sh -g all
 
   /usr/share/openhexa/openhexa.sh -g update
   /usr/share/openhexa/openhexa.sh -g prepare

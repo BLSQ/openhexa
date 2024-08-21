@@ -9,8 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 # shellcheck source=script/common_functions.sh
 source "${SCRIPT_DIR}/common_functions.sh"
 
-PGSQL_VERSION=""
-PGSQL_CLUSTER=""
+function postgresql_server_version() {
+  pg_config --version | cut -d\  -f2 | cut -d. -f1
+}
+
+PGSQL_VERSION=$(postgresql_server_version)
+PGSQL_CLUSTER="openhexa"
 
 function usage() {
   echo """
@@ -27,8 +31,10 @@ function usage() {
 
   COMMANDS:
 
-  env       sets up the environment and stores it in a file
-  db        sets up db
+  all       sets up all: first the PostgreSQL database, then the environment
+  env       sets up the environment and stores it in a file (requires an
+            existing PostgreSQL cluster named \`openhexa\`)
+  db        sets up the PostgreSQL database
   purge     stops OpenHexa and purges the configuration and the environment
   check     checks installation
   help      prints current usage documentation
@@ -126,8 +132,8 @@ EOF
 
 function is_postgresql_service_running() {
   local result
-  echo -n "- postgresql service is ... "
-  if pg_isready >/dev/null 2>&1; then
+  echo -n "- postgresql cluster ${PGSQL_CLUSTER} is ... "
+  if pg_isready -p $(get_postgresql_port_for_cluster_openhexa) >/dev/null 2>&1; then
     echo "running"
     return 0
   else
@@ -217,18 +223,12 @@ function is_systemd_service_installed_and_enabled() {
   esac
 }
 
-function get_postgresql_name_for_port() {
-  local port=$1
-  pg_lsclusters --no-header | sed -e "s/[[:space:]]\+/,/g" | grep "$port" | cut -d, -f2
+function does_postgresql_cluster_openhexa_exist() {
+  pg_lsclusters --no-header | sed -e "s/[[:space:]]\+/,/g" | cut -d, -f2 | grep -q "^${PGSQL_CLUSTER}$"
 }
 
-function get_postgresql_version_for_port() {
-  local port=$1
-  pg_lsclusters --no-header | sed -e "s/[[:space:]]\+/,/g" | grep "$port" | cut -d, -f1
-}
-
-function get_last_postgresql_port() {
-  pg_lsclusters --no-header | sed -e "s/[[:space:]]\+/,/g" | cut -d, -f3 | sort | uniq | tail -1
+function get_postgresql_port_for_cluster_openhexa() {
+  pg_conftool "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" show port | sed -e "s/^port = //"
 }
 
 function create_postgresql_user() {
@@ -304,7 +304,13 @@ function dist_dot_env_file() {
 
 function setup_env() {
   local db_port
-  db_port=$(get_last_postgresql_port)
+
+  if ! does_postgresql_cluster_openhexa_exist >/dev/null 2>&1; then
+    echo "The PostgreSQL cluster for OpenHexa hasn't been created."
+    echo "Please first run \`$0 db\` or \`$0 all\`."
+    return 1
+  fi
+  db_port=$(get_postgresql_port_for_cluster_openhexa)
   [[ ! -r "$(dot_env_file)" ]] && (
     AWS_ACCESS_KEY_ID=$(openssl rand -hex 16) \
     AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 42) \
@@ -313,19 +319,31 @@ function setup_env() {
   )
 }
 
+function create_pgsql_cluster() {
+  $SUDO_COMMAND pg_createcluster "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" --start >/dev/null 2>&1
+}
+
 function setup_db() {
-  PGSQL_VERSION=$(get_postgresql_version_for_port "$DB_PORT")
-  PGSQL_CLUSTER=$(get_postgresql_name_for_port "$DB_PORT")
+  local db_port
+
+  if ! does_postgresql_cluster_openhexa_exist; then
+    create_pgsql_cluster
+  fi
+
+  if ! is_postgresql_service_running >/dev/null 2>&1; then
+    restart_postgreql
+  fi
+
+  db_port=$(get_postgresql_port_for_cluster_openhexa)
 
   listen_on_docker_network
   allow_access_from_docker "$(docker_bridge_gateway_subnet)" all all
   restart_postgreql
 
-  create_postgresql_user "$DB_PORT" hexa-app hexa-app
-  create_postgresql_db "$DB_PORT" hexa-app hexa-app
-  create_postgresql_user "$DB_PORT" hexa-hub hexa-hub
-  create_postgresql_db "$DB_PORT" hexa-hub hexa-hub
-
+  create_postgresql_user "${db_port}" hexa-app hexa-app
+  create_postgresql_db "${db_port}" hexa-app hexa-app
+  create_postgresql_user "${db_port}" hexa-hub hexa-hub
+  create_postgresql_db "${db_port}" hexa-hub hexa-hub
 }
 
 function purge_env() {
@@ -338,108 +356,26 @@ function purge_env() {
   echo "removed"
 }
 
-function drop_postgresql_user() {
-  local port username
-  port=$1
-  username=$2
-  (
-    cd /tmp
-    $SUDO_COMMAND su postgres -c "dropuser --if-exists -p \"${port}\" \"${username}\" 2>/dev/null"
-  )
-}
-
-function drop_postgresql_db() {
-  local port dbname
-  port=$1
-  dbname=$2
-  (
-    cd /tmp
-    $SUDO_COMMAND su postgres -c "dropdb --if-exists -p \"${port}\" \"$dbname\" 2>/dev/null"
-  )
-}
-
-function does_db_exist() {
-  local port db_name
-  port=$1
-  db_name=$2
-  (
-    cd /tmp
-    $SUDO_COMMAND su postgres -c "psql -p \"${port}\" -lqt | cut -d \| -f 1 | grep -qw \"${db_name}\""
-  )
-}
-
-function does_table_exist() {
-  local port db_name table_name
-  port=$1
-  db_name=$2
-  table_name=$3
-  (
-    cd /tmp
-    $SUDO_COMMAND su postgres -c "psql -p \"${port}\" -tXAc \"SELECT EXISTS( SELECT FROM pg_tables WHERE schemaname='${db_name}' AND tablename='${table_name}');\" | grep -q t"
-  )
-}
-
-function does_user_exist() {
-  local port username
-  port=$1
-  username=$2
-  (
-    cd /tmp
-    $SUDO_COMMAND su postgres -c "psql -p \"${port}\" -tXAc \"SELECT 1 FROM pg_roles WHERE rolname='$username';\" | grep -q 1"
-  )
-}
-
-function list_openhexa_db_workspaces() {
-  local port
-  port=$1
-  if does_db_exist "${port}" hexa-app && does_table_exist "${port}" hexa-app workspaces_workspace; then
-    (
-      cd /tmp
-      $SUDO_COMMAND su postgres -c "psql -p \"${port}\" hexa-app -Atc \"SELECT db_name FROM workspaces_workspace;\""
-    )
-  elif does_user_exist "${port}" hexa-app; then
-    (
-      cd /tmp
-      $SUDO_COMMAND su postgres -c "psql -p \"${port}\" -Atc \"SELECT datname FROM pg_database JOIN pg_authid ON pg_database.datdba = pg_authid.oid WHERE has_database_privilege('hexa-app', datname, 'CONNECT') AND rolname <> 'postgres';\""
-    )
-  else
-    echo ""
-  fi
-}
-
 function purge_db() {
-  local db_port
-  db_port=$(get_last_postgresql_port)
-
   echo "Purge database:"
 
-  for workspace_db in $(list_openhexa_db_workspaces "$db_port"); do
-    echo -n "- workspace database ${workspace_db} ... "
-    drop_postgresql_db "$db_port" "$workspace_db"
-    echo -n "dropped db ... "
-    drop_postgresql_user "$db_port" "$workspace_db"
-    echo "dropped user"
-  done
-  for app_db in hexa-app hexa-hub; do
-    echo -n "- app database ${app_db} ... "
-    drop_postgresql_db "$db_port" "$app_db"
-    echo -n "dropped db ... "
-    drop_postgresql_user "$db_port" "$app_db"
-    echo "dropped user"
-
-  done
+  $SUDO_COMMAND pg_dropcluster --stop "${PGSQL_VERSION}" "${PGSQL_CLUSTER}"
 }
 
 function execute() {
   local command=$1
   local exit_code=0
   case "${command}" in
+  all)
+    setup_db || exit_properly 1
+    setup_env || exit_properly 1
+    exit_properly 0
+    ;;
   env)
     setup_env
     exit_properly 0
     ;;
   db)
-    load_env
     setup_db
     exit_properly 0
     ;;

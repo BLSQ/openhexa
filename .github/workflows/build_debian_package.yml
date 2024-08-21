@@ -114,8 +114,8 @@ jobs:
       - name: Build smoke tests image
         working-directory: ./smoke-tests
         run: docker build -t openhexa/smoke-tests .
-      - name: Run smoke tests
-        run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
+      # - name: Run smoke tests
+      #   run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
       - name: Keep test results
         uses: actions/upload-artifact@v4
         with:

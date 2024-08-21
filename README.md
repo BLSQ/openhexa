@@ -59,7 +59,7 @@ Requirements:
 You can check your installation by running first
 
 ```bash
-./script/setup check
+./script/setup.sh check
 ```
 
 It'll tell you that the `.env` is missing, that is expected as it's the next
@@ -69,8 +69,7 @@ Then, you need to setup the environment and the database. To do so execute the
 following command
 
 ```bash
-./script/setup env
-./script/setup db
+./script/setup.sh all
 ```
 
 Then you can prepare the database and environment with
