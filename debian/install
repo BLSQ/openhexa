@@ -1,3 +1,5 @@
 .env.dist etc/openhexa
 compose.yml	usr/share/openhexa
 script/openhexa.sh usr/share/openhexa
+script/setup.sh usr/share/openhexa
+script/common_functions.sh /usr/share/openhexa

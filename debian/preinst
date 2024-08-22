@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -e
+
+function is_yq_installed() {
+  echo -n "binary yq ... "
+  if [[ $(yq -V) =~ yq.*version\ v.* ]]; then
+    echo "installed"
+  else
+    echo "not installed (See https://github.com/mikefarah/yq/#install )"
+    exit 1
+  fi
+}
+
+is_yq_installed
+
+#DEBHELPER#
+
+exit 0

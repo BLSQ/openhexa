@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+
+case "$1" in
+remove)
+  /usr/share/openhexa/setup.sh -g purge
+  ;;
+*)
+  echo "prerm called with unknown argument \`$1'" >&2
+  exit 0
+  ;;
+esac
+
+#DEBHELPER#
+
+exit 0

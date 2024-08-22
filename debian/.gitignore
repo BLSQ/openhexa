@@ -1,0 +1,6 @@
+.debhelper/
+debhelper-build-stamp
+files
+openhexa.postrm.debhelper
+openhexa.substvars
+openhexa/

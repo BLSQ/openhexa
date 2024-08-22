@@ -10,6 +10,10 @@ test("is web ready?", async ({ page }) => {
 
 test.describe("it can view a workspace's common pages", () => {
   test("view workspace's dashboard", async ({ page, workspacePage }) => {
+    page.on('console', msg => {
+      if (msg.type() === 'error')
+        console.log(`Error text: "${msg.text()}"`);
+    });
     await expect(
       workspacePage.getByText(/Where to go from here?/),
     ).toBeVisible();
