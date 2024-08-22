@@ -72,6 +72,9 @@ following command
 ./script/setup.sh all
 ```
 
+This will generate a file in the working directory: `.env` (ee below to
+know more about the configuration properties).
+
 Then you can prepare the database and environment with
 
 ```bash
@@ -167,8 +170,9 @@ in your current directory. For instance, to get its status, you can execute:
 #### Configuration
 
 The installation will also sets up the environment, especially the PostgreSQL
-database. The configuration is stored in the file `/etc/openhexa/env.conf`. If
-you need to change or add, you can directly change this file, then restarts
+database. The configuration is stored in the file `/etc/openhexa/env.conf`
+(see below for more information about the configuration properties). If you
+need to change or add, you can directly change this file, then restarts
 OpenHexa with `sudo systemctl restart openhexa`.
 
 If you need to set it up again, check the installation, or purge the environment
@@ -212,3 +216,15 @@ act --action-offline-mode push
 Warning: Make sure to remove your local `.env` before running it as `act` copies your working copy rather than using the checking out action. When it
 happens, it overrides other environment files that are provided to the compose
 project, which is used to configure it (`/etc/openhexa/env.conf`).
+
+#### Configuration properties
+
+##### The storage engine
+
+Locally, we use Minio to manage the storage. It provides a AWS S3 compatible
+API. To access to it, you need to provide a key Id and a secret:
+`WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID` and
+`WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY`.
+
+Finally, we need the port number where the local PostgreSQL cluster listens:
+`DB_PORT`
