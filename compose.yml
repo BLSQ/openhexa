@@ -1,44 +1,59 @@
-# Defines a service that can be reused multiple times later
+# This Docker Compose manifest is dedicated to a local installation
+# of OpenHexa.
+# Do not change it without good reaons.
+
 x-app: &common
-    image: "blsq/openhexa-app:${BACKEND_VERSION:-latest}"
+    image: "blsq/openhexa-app:local"
     platform: linux/amd64
     networks:
       - openhexa
     extra_hosts:
       db: host-gateway
+    volumes:
+      - "${WORKSPACE_STORAGE_LOCATION}:/data"
+    env_file:
+      - path: ${OPENHEXA_CONF_FILE}
+        required: true
     environment:
-      - DEBUG=true
-      - DJANGO_SETTINGS_MODULE=config.settings.dev
-      - DATABASE_HOST=db
-      - DATABASE_PORT=${DB_PORT:-5432}
-      - DATABASE_NAME=hexa-app
-      - DATABASE_USER=hexa-app
-      - DATABASE_PASSWORD=hexa-app
-      - NEW_FRONTEND_DOMAIN=localhost:3000
-      - PIPELINE_SCHEDULER_SPAWNER=docker
-      - PIPELINE_API_URL=http://app:8000
-      - DEBUG_LOGGING=${DEBUG_LOGGING}
-      - DEBUG_TOOLBAR=${DEBUG_TOOLBAR}
-      - WORKSPACES_DATABASE_ROLE=hexa-app
-      - WORKSPACES_DATABASE_PASSWORD=hexa-app
-      - WORKSPACES_DATABASE_HOST=db
-      - WORKSPACES_DATABASE_PORT=${DB_PORT:-5432}
-      - WORKSPACES_DATABASE_DEFAULT_DB=hexa-app
-      - WORKSPACES_DATABASE_PROXY_HOST=db
-      - WORKSPACE_STORAGE_ENGINE_AWS_ENDPOINT_URL=http://minio:9000
-      - WORKSPACE_STORAGE_ENGINE=s3
-      - WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID=${WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID}
-      - WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY=${WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY}
-      - WORKSPACE_STORAGE_ENGINE_AWS_BUCKET_REGION=europe-west1
-      - NOTEBOOKS_HUB_URL=http://jupyterhub:8000/hub
-      - HUB_API_TOKEN=cbb352d6a412e266d7494fb014dd699373645ec8d353e00c7aa9dc79ca87800d
-      - WORKSPACE_BUCKET_PREFIX=hexa-test-
-      - WORKSPACE_BUCKET_REGION=europe-west1
-      - DEFAULT_WORKSPACE_IMAGE=blsq/openhexa-base-environment
+      # Internal configuration
+      ########################
+      # It allows us to run the fixture command
+      DEBUG: true
+      # The Python module where Django can find its settings
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      # The URI to access the Jupyter Hub through the local Docker network
+      NOTEBOOKS_HUB_URL: http://jupyterhub:8000/hub
+      # The URL passed to the pipelines to access the backend API through the
+      # local Docker network.
+      PIPELINE_API_URL: http://app:8000
+      # The hostname to access the database. It corresponds to an added extra
+      # host that is the Docker gateway (see above).
+      DATABASE_HOST: db
+      WORKSPACES_DATABASE_HOST: db
+      WORKSPACES_DATABASE_PROXY_HOST: db
+      # To control what hostname can access the backend
+      ALLOWED_HOSTS: "app,frontend,localhost"
+      # Disable HTTPS
+      SECURE_SSL_REDIRECT: false
+      SESSION_COOKIE_SECURE: false
+      CSRF_COOKIE_SECURE: false
+      HOST_SCHEME: http://
+      CORS_REPLACE_HTTPS_REFERER: false
+      # Networking
+      ############
+      # The URL to access OpenHexa frontend from the outside
+      NEW_FRONTEND_DOMAIN: ${PUBLIC_HOSTNAME:-localhost}:${FRONTEND_PORT:-3000}
+      # The URL to access OpenHexa Jupyter Hub from the outside
+      NOTEBOOKS_URL: ${SCHEME:-http}://${PUBLIC_HOSTNAME:-localhost}:${JUPYTERHUB_PORT:-8001}
+      # The CORS to access OpenHexa from the outside
+      CORS_ALLOWED_ORIGINS: ${SCHEME:-http}://${PUBLIC_HOSTNAME:-localhost}:${FRONTEND_PORT:-3000}
+      CORS_TRUSTED_ORIGINS: ${SCHEME:-http}://${PUBLIC_HOSTNAME:-localhost}:${FRONTEND_PORT:-3000}
+      CORS_URLS_REGEX: r"^/graphql/(\w+\/)?$"
+      CORS_ALLOW_CREDENTIALS: True
+
 
 services:
   app:
-    # Inherit from the block defined on top and override some fields
     <<: *common
     command: "manage runserver 0:8000"
     restart: unless-stopped
@@ -53,15 +68,21 @@ services:
       retries: 3
   
   frontend:
-    image: "blsq/openhexa-frontend:${FRONTEND_VERSION:-main}"
+    image: "blsq/openhexa-frontend:main"
     platform: linux/amd64
     networks:
       - openhexa
     container_name: frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+    env_file:
+      - path: ${OPENHEXA_CONF_FILE}
+        required: true
     environment:
-      - OPENHEXA_BACKEND_URL=http://app:8000
+      # Internal configuration
+      ########################
+      # The URL to access the backend through the local Docker network
+      OPENHEXA_BACKEND_URL: http://app:8000
     profiles:
       - frontend
     restart: unless-stopped
@@ -91,10 +112,6 @@ services:
 
   pipelines_scheduler:
     <<: *common
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: pipelines
     command: "manage pipelines_scheduler"
     restart: unless-stopped
     profiles:
@@ -106,27 +123,6 @@ services:
       start_period: "15s"
       retries: 3
 
-  minio:
-    image: quay.io/minio/minio
-    command: server --address 0.0.0.0:9000 --console-address ":9001" /data
-    volumes:
-      - minio_data:/data
-    profiles:
-      - minio
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    networks:
-      - openhexa
-    environment:
-      - MINIO_ROOT_USER=${WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID}
-      - MINIO_ROOT_PASSWORD=${WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY}
-    healthcheck:
-      test: mc ready local || exit 1
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
   jupyter:
     image: blsq/openhexa-base-environment
     platform: linux/amd64
@@ -136,27 +132,43 @@ services:
 
   jupyterhub:
     platform: linux/amd64
-    image: blsq/openhexa-jupyterhub:local-2024.04.18-1
+    image: blsq/openhexa-jupyterhub:localhosting
     command: ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_dev_config.py"]
     container_name: jupyterhub
     networks:
       - openhexa
     profiles:
       - notebook
+    env_file:
+      - path: ${OPENHEXA_CONF_FILE}
+        required: true
     environment:
-      LOAD_DEV_CONFIG: "true"
-      JUPYTER_IMAGE: blsq/openhexa-base-environment
+      # Internal configuration
+      ########################
+      # The name of the local Docker network to join
       DOCKER_NETWORK_NAME: openhexa
+      # The hostname where to access the Jupyter Hub service on the local Docker
+      # network
       HUB_IP: jupyterhub
-      HUB_DB_URL: postgresql://hexa-hub:hexa-hub@host.docker.internal:${DB_PORT:-5432}/hexa-hub
+      # The URI of the database dedicated to the Jupyter Hub
+      HUB_DB_URL: postgresql://${JUPYTERHUB_DATABASE_USER:-hexa-hub}:${JUPYTERHUB_DATABASE_PASSWORD:-hexa-hub}@host.docker.internal:${DATABASE_PORT:-5432}/${JUPYTERHUB_DATABASE_NAME:-hexa-hub}
+      # The URI to authenticate by the backend through the local Docker network
       AUTHENTICATION_URL: http://app:8000/notebooks/authenticate/
+      # The URI to get the default credentials by the backend through the local
+      # Docker network
       DEFAULT_CREDENTIALS_URL: http://app:8000/notebooks/default-credentials/
+      # The URI to get the workspace credentials by the backend through the
+      # local Docker network
       WORKSPACE_CREDENTIALS_URL: http://app:8000/workspaces/credentials/
+      # The URL to log out by the backend through the local Docker network
       LOGOUT_REDIRECT_URL: http://app:8000/
+      # The URL to access the backend through the local Docker network
       HEXA_SERVER_URL: http://app:8000/
-      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' localhost:*"
-      JUPYTERHUB_CRYPT_KEY: 0b9c2791baa0b19e10f1dc9c4a1a702dda0a37c332378870e9542271a365b9b8
-      HUB_API_TOKEN: cbb352d6a412e266d7494fb014dd699373645ec8d353e00c7aa9dc79ca87800d
+      # Make sure that we load the settings to run locally
+      LOAD_DEV_CONFIG: "true"
+      # Networking
+      ############
+      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' ${PUBLIC_HOSTNAME:-localhost}:*"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
@@ -174,7 +186,3 @@ services:
 networks:
   openhexa:
     name: openhexa
-volumes:
-  pgdata:
-  minio_data:
-

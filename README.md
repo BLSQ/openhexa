@@ -100,6 +100,13 @@ you can do it by executing the following command
 ./script/openhexa.sh purge
 ```
 
+Once installed, it could be interesting to make sure you have the last version.
+You can update openhexa with
+
+```bash
+./script/openhexa.sh update
+```
+
 ### Debian Package
 
 #### Build

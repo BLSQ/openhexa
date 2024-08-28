@@ -2,6 +2,7 @@
 
 COMPOSE_FILE_PATH="compose.yml"
 CONFIG_FILE_PATH=".env"
+WORKSPACE_DATA_DIRECTORY="workspaces"
 
 SUDO_COMMAND="sudo"
 
@@ -18,6 +19,7 @@ function setup() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
     COMPOSE_FILE_PATH="/usr/share/openhexa/compose.yml"
     CONFIG_FILE_PATH="/etc/openhexa/env.conf"
+    WORKSPACE_DATA_DIRECTORY="/var/lib/openhexa/workspaces"
   fi
   if ((UID == 0)); then
     SUDO_COMMAND=""
@@ -35,9 +37,10 @@ function disable_debug() {
 }
 
 function run_compose() {
-  docker compose \
-    --file "${COMPOSE_FILE_PATH}" \
+  OPENHEXA_CONF_FILE="${CONFIG_FILE_PATH}" \
+    docker compose \
     --env-file "${CONFIG_FILE_PATH}" \
+    --file "${COMPOSE_FILE_PATH}" \
     --project-name openhexa \
     $@
 }
