@@ -2,6 +2,7 @@
 
 COMPOSE_FILE_PATH="compose.yml"
 CONFIG_FILE_PATH=".env"
+WORKSPACE_DATA_DIRECTORY="workspaces"
 
 SUDO_COMMAND="sudo"
 
@@ -18,6 +19,7 @@ function setup() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
     COMPOSE_FILE_PATH="/usr/share/openhexa/compose.yml"
     CONFIG_FILE_PATH="/etc/openhexa/env.conf"
+    WORKSPACE_DATA_DIRECTORY="/var/lib/openhexa/workspaces"
   fi
   if ((UID == 0)); then
     SUDO_COMMAND=""
@@ -34,10 +36,45 @@ function disable_debug() {
   set +xv
 }
 
+function dist_dot_env_file() {
+  local current_env_file="/etc/openhexa/.env.dist"
+  if [[ $OPTION_GLOBAL == "off" ]]; then
+    current_env_file=".env.dist"
+  fi
+  echo "$current_env_file"
+}
+
+function get_config_or_default() {
+  local variable_name=$1
+  local env_file
+  env_file=$(dist_dot_env_file)
+  [[ -r "$(dot_env_file)" ]] && env_file=$(dot_env_file)
+  (
+    # shellcheck source=.env.dist
+    source "${env_file}"
+    echo "${!variable_name}"
+  )
+}
+
+function get_proxy_url() {
+  local proxy_url
+  proxy_url=$(get_config_or_default PROXY_URL)
+  if [[ -n $proxy_url ]]; then
+    echo "${proxy_url}"
+  fi
+}
+
 function run_compose() {
-  docker compose \
-    --file "${COMPOSE_FILE_PATH}" \
+  local proxy_url
+  proxy_url=$(get_proxy_url)
+  OPENHEXA_CONF_FILE="${CONFIG_FILE_PATH}" \
+    NEW_FRONTEND_DOMAIN="${proxy_url}" \
+    NOTEBOOKS_URL="${proxy_url}" \
+    CORS_ALLOWED_ORIGINS="${proxy_url}" \
+    CORS_TRUSTED_ORIGINS="${proxy_url}" \
+    docker compose \
     --env-file "${CONFIG_FILE_PATH}" \
+    --file "${COMPOSE_FILE_PATH}" \
     --project-name openhexa \
     $@
 }

@@ -28,6 +28,7 @@ function usage() {
   stop      stops all services
   status    reports current status
   ps        reports running services
+  config    reports the config used
   update    pulls last container images
   prepare   runs database migrations and installs fixtures
   logs      gets all the logs
@@ -82,6 +83,7 @@ function is_backend_reachable() {
 }
 
 function is_db_accepting_connexion() {
+  # TODO replace with get_config_or_default
   load_env
   pg_isready -p "${DB_PORT}" >/dev/null 2>&1
   return 0
@@ -142,6 +144,10 @@ function execute() {
       exit_code=1
     fi
     exit_properly $exit_code
+    ;;
+  config)
+    run_compose_with_profiles config
+    exit_properly 0
     ;;
   ps)
     run_compose_with_profiles ps

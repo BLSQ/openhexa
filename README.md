@@ -100,6 +100,13 @@ you can do it by executing the following command
 ./script/openhexa.sh purge
 ```
 
+Once installed, it could be interesting to make sure you have the last version.
+You can update openhexa with
+
+```bash
+./script/openhexa.sh update
+```
+
 ### Debian Package
 
 #### Build
@@ -239,4 +246,157 @@ Warning: Make sure to remove your local `.env` before running it as `act` copies
 happens, it overrides other environment files that are provided to the compose
 project, which is used to configure it (`/etc/openhexa/env.conf`).
 
+##### The storage engine
 
+Locally, we use Minio to manage the storage. It provides a AWS S3 compatible
+API. To access to it, you need to provide a key Id and a secret:
+`WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID` and
+`WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY`.
+
+Finally, we need the port number where the local PostgreSQL cluster listens:
+`DB_PORT`
+
+#### Publish OpenHexa through a NGINX proxy
+
+##### Without TLS/SSL
+
+The following requires you the following:
+
+- a machine with a public IP address,
+- a domain name for which you manage the zone,
+- the NGINX service,
+
+Create a file `/etc/nginx/sites-available/openhexa` with the following content
+(replace `example.com` with your domain name):
+
+```
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    server_name example.com;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    location ~ ^/(?<root_path>hub|user)(?<path>/.*)? {
+        rewrite ^ /$root_path$path break;
+        proxy_pass http://localhost:8001;
+
+        # websocket headers
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header X-Scheme $scheme;
+
+        proxy_buffering off;
+    }
+
+
+    location / {
+        proxy_pass http://localhost:3000;
+    }
+
+}
+```
+
+Enable and check it:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/openhexa /etc/nginx/sites-enabled/
+sudo nginx -t
+```
+
+You need to update on OpenHexa config in `/etc/openhexa/env.conf`:
+
+```bash
+TRUST_FORWARDED_PROTO="no"
+PROXY_HOSTNAME_AND_PORT=example.com
+INTERNAL_BASE_URL=http://app:8000
+FRONTEND_PORT=3000
+JUPYTERHUB_PORT=8001
+```
+
+Finally, restart NGINX and OpenHexa:
+
+```bash
+sudo systemctl restart openhexa nginx
+```
+
+You can browse now OpenHexa app at `http://example.com`.
+
+##### With TLS/SSL
+
+Additionnaly, you need a certificate. The way it has been retrieved is up to the reader. For the rest, follow the same playbook, except to use the following
+config
+
+in `/etc/nginx/sites-available/openhexa`:
+
+```
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    server_name example.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name example.com;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+    ssl_protocols TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers EECDH+AESGCM:EDH+AESGCM;
+    ssl_ecdh_curve secp384r1;
+    ssl_session_timeout  10m;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+
+    location ~ ^/(?<root_path>hub|user)(?<path>/.*)? {
+        rewrite ^ /$root_path$path break;
+        proxy_pass http://localhost:8001;
+
+        # websocket headers
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header X-Scheme $scheme;
+
+        proxy_buffering off;
+    }
+
+
+    location / {
+        proxy_pass http://localhost:3000;
+    }
+
+}
+```
+
+and in `/etc/openhexa/env.conf`
+
+```bash
+TRUST_FORWARDED_PROTO="yes"
+PROXY_HOSTNAME_AND_PORT=example.com
+INTERNAL_BASE_URL=http://app:8000
+FRONTEND_PORT=3000
+JUPYTERHUB_PORT=8001
+```
