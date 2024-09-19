@@ -56,7 +56,8 @@ Requirements:
 - Debian packages `gettext-base` `postgresql` `postgresql-14-postgis-3`
 - [yq](https://github.com/mikefarah/yq/#install)
 
-You can check your installation by running first
+After having cloned this repo and change your current dir to it, you can check
+your installation by running first
 
 ```bash
 ./script/setup.sh check
@@ -145,14 +146,22 @@ Requirements:
 - [yq](https://github.com/mikefarah/yq/#install)
 
 You can install OpenHexa on your system and run it as a Systemd service
-`openhexa` (that you can then manage with `systemctl`). Run the following
-command:
+`openhexa` (that you can then manage with `systemctl`).
+
+
+First of all, you need to add our APT repository and GPG public key:
 
 ```bash
-sudo dpkg -i openhexa_1.0-1.deb
+curl -fsSL https://raw.githubusercontent.com/xlionjuan/apt-repo/refs/heads/main/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/openhexa.gpg
+echo "deb [signed-by=/usr/share/keyrings/openhexa.gpg] https://viz.bluesquare.org/openhexa/ bookworm main" | sudo tee /etc/apt/sources.list.d/openhexa.list
 ```
 
-Notice this requires super user right (that's what `sudo` gives you).
+Then, you can update your APT database and install openhexa
+
+```bash
+sudo apt update
+sudo apt install openhexa
+```
 
 #### Usage
 

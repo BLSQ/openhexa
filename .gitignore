@@ -1,3 +1,5 @@
 .env
 .envlocal
 test-results/
+.secrets
+openhexa.nginx
