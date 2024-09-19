@@ -197,6 +197,28 @@ During the setup, the following is done on the PostgreSQL side:
 - authorize `hexa-hub` to connect to `hexa-hub` from the entier Docker
   subnetwork with encrypted password authentication.
 
+#### Configuration properties
+
+##### The storage engine
+
+Locally, we use Minio to manage the storage. It provides a AWS S3 compatible
+API. To access to it, you need to provide a key Id and a secret:
+`WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID` and
+`WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY`.
+
+Finally, we need the port number where the local PostgreSQL cluster listens:
+`DB_PORT`
+
+##### Email server
+
+In order to be able to send mails to users, you have to provide the configuration options:
+- `EMAIL_HOST`
+- `EMAIL_PORT`
+- `EMAIL_HOST_USER`
+- `EMAIL_USE_TLS`
+- `EMAIL_HOST_PASSWORD`
+
+
 #### Test
 
 To test if OpenHexa has been correctly installed, you can run smoke tests that
@@ -217,14 +239,4 @@ Warning: Make sure to remove your local `.env` before running it as `act` copies
 happens, it overrides other environment files that are provided to the compose
 project, which is used to configure it (`/etc/openhexa/env.conf`).
 
-#### Configuration properties
 
-##### The storage engine
-
-Locally, we use Minio to manage the storage. It provides a AWS S3 compatible
-API. To access to it, you need to provide a key Id and a secret:
-`WORKSPACE_STORAGE_ENGINE_AWS_ACCESS_KEY_ID` and
-`WORKSPACE_STORAGE_ENGINE_AWS_SECRET_ACCESS_KEY`.
-
-Finally, we need the port number where the local PostgreSQL cluster listens:
-`DB_PORT`
