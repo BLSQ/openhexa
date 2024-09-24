@@ -238,7 +238,7 @@ function create_postgresql_user() {
   password=$3
   (
     cd /tmp
-    $SUDO_COMMAND su postgres <<-EOFSU
+    $SUDO_COMMAND su postgres >/dev/null 2>&1 <<-EOFSU
 psql -p "${port}" <<-EOFPSQL
 CREATE USER "${username}" WITH SUPERUSER PASSWORD '${password}'
 EOFPSQL
@@ -264,9 +264,9 @@ function listen_on_docker_network() {
   past_listened_addresses="$(pg_conftool -s "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" show listen_addresses || echo "")"
   gateway_address="$(docker_bridge_gateway_address)"
   if [[ -z $past_listened_addresses ]]; then
-    pg_conftool "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" set listen_addresses "127.0.0.1,${gateway_address}"
+    $SUDO_COMMAND pg_conftool "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" set listen_addresses "127.0.0.1,${gateway_address}"
   elif [[ $past_listened_addresses != *$gateway_address* ]]; then
-    pg_conftool "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" set listen_addresses "${past_listened_addresses},${gateway_address}"
+    $SUDO_COMMAND pg_conftool "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" set listen_addresses "${past_listened_addresses},${gateway_address}"
   fi
 }
 
@@ -290,33 +290,86 @@ function create_postgresql_db() {
   dbname=$3
   (
     cd /tmp
-    $SUDO_COMMAND su postgres -c "createdb -p \"${port}\" -O \"${owner}\" \"$dbname\""
+    $SUDO_COMMAND su postgres -c "createdb -p \"${port}\" -O \"${owner}\" \"$dbname\" >/dev/null 2>&1"
   )
 }
 
-function dist_dot_env_file() {
-  local current_env_file="/etc/openhexa/.env.dist"
-  if [[ $OPTION_GLOBAL == "off" ]]; then
-    current_env_file=".env.dist"
+OPENHEXA_USER=openhexa
+OPENHEXA_GROUP=openhexa
+
+function setup_user() {
+  if [[ $OPTION_GLOBAL == "on" ]]; then
+    $SUDO_COMMAND addgroup --system "${OPENHEXA_GROUP}"
+    $SUDO_COMMAND adduser --system --ingroup "${OPENHEXA_GROUP}" "${OPENHEXA_USER}"
+    $SUDO_COMMAND usermod -a -G docker "${OPENHEXA_USER}"
   fi
-  echo "$current_env_file"
+}
+
+function setup_local_storage() {
+  if [[ $OPTION_GLOBAL == "on" ]]; then
+    $SUDO_COMMAND mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
+    $SUDO_COMMAND chown "${OPENHEXA_USER}:${OPENHEXA_GROUP}" "${WORKSPACE_DATA_DIRECTORY}"
+  else
+    mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
+    chmod 777 "${WORKSPACE_DATA_DIRECTORY}"
+  fi
+}
+
+function generate_django_secret_key() {
+  # see https://github.com/django/django/blob/07a4d23283586bc4578eb9c82a7ad14af3724057/django/core/management/utils.py#L79
+  # for implementation
+  # $ has been removed to avoid bash substitution
+  head -c 8192 /dev/urandom | LC_ALL=C tr -dc 'abcdefghijklmnopqrstuvwxyz0123456789!@#%^&*(-_=+)$' | head -c 50
+}
+
+function generate_fernet_encryption_key() {
+  # see https://github.com/pyca/cryptography/blob/main/src/cryptography/fernet.py#L48
+  # for implementation
+  # Bash implementation credited to
+  # https://github.com/fernet/fernet-rb#generating-a-secret
+  dd if=/dev/urandom bs=32 count=1 2>/dev/null | openssl base64
 }
 
 function setup_env() {
-  local db_port
+  local db_port current_working_directory
+
+  echo "Setup environment:"
 
   if ! does_postgresql_cluster_openhexa_exist >/dev/null 2>&1; then
     echo "The PostgreSQL cluster for OpenHexa hasn't been created."
     echo "Please first run \`$0 db\` or \`$0 all\`."
     return 1
   fi
+
   db_port=$(get_postgresql_port_for_cluster_openhexa)
+
+  if [[ $OPTION_GLOBAL == "on" ]]; then
+    if [[ $(pwd) != "/" ]]; then
+      current_working_directory=$(pwd)
+    fi
+  else
+    current_working_directory="$(pwd)/"
+  fi
+
+  echo -n "- generate configuration file ... "
   [[ ! -r "$(dot_env_file)" ]] && (
-    AWS_ACCESS_KEY_ID=$(openssl rand -hex 16) \
-    AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 42) \
+    JUPYTERHUB_CRYPT_KEY=$(openssl rand -hex 32) \
+    HUB_API_TOKEN=$(openssl rand -hex 32) \
+    SECRET_KEY=$(generate_django_secret_key) \
+    ENCRYPTION_KEY=$(generate_fernet_encryption_key) \
+    WORKSPACE_STORAGE_LOCATION="${current_working_directory}${WORKSPACE_DATA_DIRECTORY}" \
     DB_PORT=$db_port \
       envsubst <"$(dist_dot_env_file)" >"$(dot_env_file)"
   )
+  echo "done"
+
+  echo -n "- create user if installed globally ... "
+  setup_user
+  echo "done"
+
+  echo -n "- create local storage ... "
+  setup_local_storage
+  echo "done"
 }
 
 function create_pgsql_cluster() {
@@ -325,41 +378,127 @@ function create_pgsql_cluster() {
 
 function setup_db() {
   local db_port
+  echo "Setup database:"
 
+  echo -n "- create cluster if it does not exists ... "
   if ! does_postgresql_cluster_openhexa_exist; then
     create_pgsql_cluster
   fi
+  echo "created"
 
+  echo -n "- check the cluster is running ... "
   if ! is_postgresql_service_running >/dev/null 2>&1; then
     restart_postgreql
   fi
+  echo "running"
 
   db_port=$(get_postgresql_port_for_cluster_openhexa)
 
+  echo -n "- make the cluster listening on the Docker network ... "
   listen_on_docker_network
-  allow_access_from_docker "$(docker_bridge_gateway_subnet)" all all
-  restart_postgreql
+  echo "done"
 
-  create_postgresql_user "${db_port}" hexa-app hexa-app
-  create_postgresql_db "${db_port}" hexa-app hexa-app
-  create_postgresql_user "${db_port}" hexa-hub hexa-hub
-  create_postgresql_db "${db_port}" hexa-hub hexa-hub
+  echo -n "- allow access to the cluster from the docker network ... "
+  allow_access_from_docker "$(docker_bridge_gateway_subnet)" all all
+  echo "done"
+
+  echo -n "- restart the cluster to take in account new setup ... "
+  restart_postgreql
+  echo "done"
+
+  echo -n "- create users and databases for the Open Hexa app and Jupyter Hub ... "
+  create_postgresql_user "${db_port}" "$(get_config_or_default DATABASE_USER)" "$(get_config_or_default DATABASE_PASSWORD)"
+  create_postgresql_db "${db_port}" "$(get_config_or_default DATABASE_NAME)" "$(get_config_or_default DATABASE_USER)"
+  create_postgresql_user "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)" "$(get_config_or_default JUPYTERHUB_DATABASE_PASSWORD)"
+  create_postgresql_db "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_NAME)" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)"
+  echo "done"
+}
+
+function remove_user_and_group() {
+  local exit_code=0
+  if [[ $OPTION_GLOBAL == "on" ]]; then
+    deluser --quiet --system "${OPENHEXA_USER}" || exit_code=$?
+    delgroup --quiet --system "${OPENHEXA_GROUP}" || exit_code=$?
+  fi
+  return $exit_code
+}
+
+function remove_local_storage() {
+  local exit_code=0
+  # To use when we set correctly UID when running containers
+  # local sudo_if_global="${SUDO_COMMAND}"
+  # [[ $OPTION_GLOBAL == "off" ]] && sudo_if_global=""
+  # $sudo_if_global find "${WORKSPACE_DATA_DIRECTORY}" -delete 2>/dev/null || exit_code=$?
+  $SUDO_COMMAND find "${WORKSPACE_DATA_DIRECTORY}" -delete 2>/dev/null || exit_code=$?
+  if (($exit_code != 0)) && [[ ! -d $WORKSPACE_DATA_DIRECTORY ]]; then
+    exit_code=0
+  fi
+  return $exit_code
+}
+
+function purge_docker_compose_project() {
+  local exit_code=0
+  if [[ -f "$(dot_env_file)" ]]; then
+    run_compose_with_profiles down --remove-orphans --volumes >/dev/null 2>&1 || exit_code=$?
+  fi
+  #TODO manage when dot env file is absent but containers are still running
+  if docker network inspect openhexa >/dev/null 2>&1; then
+    docker network remove openhexa || exit_code=$?
+  fi
+  return $exit_code
 }
 
 function purge_env() {
   echo "Purge environment:"
   echo -n "- container, network, and volumes ... "
-  [[ -f "$(dot_env_file)" ]] && run_compose_with_profiles down --remove-orphans --volumes
-  echo "removed"
+  if purge_docker_compose_project; then
+    echo "removed"
+  else
+    echo "failed"
+  fi
   echo -n "- configuration file ... "
-  [[ -f "$(dot_env_file)" ]] && rm "$(dot_env_file)"
-  echo "removed"
+  if [[ -f "$(dot_env_file)" ]]; then
+    if rm "$(dot_env_file)"; then
+      echo "removed"
+    else
+      echo "failed"
+    fi
+  else
+    echo "already removed"
+  fi
+  echo -n "- user ... "
+  if remove_user_and_group; then
+    echo "removed"
+  else
+    echo "failed"
+  fi
+  echo -n "- workspace data ... "
+  if remove_local_storage; then
+    echo "removed"
+  else
+    echo "failed"
+  fi
 }
 
 function purge_db() {
   echo "Purge database:"
+  echo -n "- drop the cluster ${PGSQL_VERSION} ${PGSQL_CLUSTER} ... "
+  if does_postgresql_cluster_openhexa_exist; then
+    if $SUDO_COMMAND pg_dropcluster --stop "${PGSQL_VERSION}" "${PGSQL_CLUSTER}"; then
+      echo "removed"
+    else
+      echo "failed"
+    fi
+  else
+    echo "already removed"
+  fi
+}
 
-  $SUDO_COMMAND pg_dropcluster --stop "${PGSQL_VERSION}" "${PGSQL_CLUSTER}"
+function prompt_sudo_password_if_needed() {
+  if (($EUID != 0)); then
+    echo "Some commands require super user right, please answer next SUDO prompt."
+    sudo -kv
+  fi
 }
 
 function execute() {
@@ -367,6 +506,7 @@ function execute() {
   local exit_code=0
   case "${command}" in
   all)
+    prompt_sudo_password_if_needed
     setup_db || exit_properly 1
     setup_env || exit_properly 1
     exit_properly 0
@@ -376,10 +516,12 @@ function execute() {
     exit_properly 0
     ;;
   db)
+    prompt_sudo_password_if_needed
     setup_db
     exit_properly 0
     ;;
   purge)
+    prompt_sudo_password_if_needed
     purge_env
     purge_db
     exit_properly 0

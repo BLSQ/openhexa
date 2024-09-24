@@ -11,6 +11,8 @@ RemainAfterExit=true
 WorkingDirectory=/etc/openhexa
 ExecStart=/usr/share/openhexa/openhexa.sh -g start
 ExecStop=/usr/share/openhexa/openhexa.sh -g stop
+User=openhexa
+Group=openhexa
 
 [Install]
 WantedBy=multi-user.target
