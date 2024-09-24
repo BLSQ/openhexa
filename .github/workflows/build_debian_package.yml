@@ -139,7 +139,6 @@ jobs:
   create_apt_repo:
     name: Create APT repo
     needs: install
-    if: ${{ ! env.ACT }}
     runs-on: ubuntu-latest
     outputs:
       artifact_id: ${{ steps.upload-artifact.outputs.artifact-id }}
@@ -164,7 +163,6 @@ jobs:
           path: ${{ steps.create-apt-repo.outputs.dir }}
   deploy_apt_repo:
     name: Publish apt repo with GitHub Pages
-    if: ${{ ! env.ACT }}
     permissions:
       id-token: write
       pages: write
