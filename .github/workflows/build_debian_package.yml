@@ -1,6 +1,13 @@
 name: build_debian_package
 run-name: ${{ github.actor }} is packaging for Debian
 on: [push]
+
+env:
+  REPO_NAME: openhexa
+  CODENAME: bookworm
+  COMPONENTS: main
+  ARCHITECTURES: amd64
+
 jobs:
   package:
     name: Build Debian package
@@ -129,29 +136,52 @@ jobs:
       - name: Remove and purge package
         run: sudo apt purge -y openhexa
 
-  # WIP
-  # create_repo_and_publish:
-  #   name: Create APT repo and publish on GitHub Pages
-  #   needs:
-  #     -install
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: debian:bookworm
-  #   outputs:
-  #     artifact_id: ${{ steps.upload-artifact.outputs.artifact-id }}
-  #     keyring: ${{ steps.create-apt-repo.outputs.keyring }}
-  #   steps:
-  #     - name: Retrieve package
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: debian_package_amd64
-  #     - uses: morph027/apt-repo-action@v2
-  #             id: create-apt-repo
-  #             with:
-  #               repo-name: ${{ env.REPO_NAME }}
-  #               signing-key: ${{ secrets.SIGNING_KEY }}
-  #           - name: Upload Pages artifact
-  #             uses: actions/upload-pages-artifact@v3
-  #             with:
-  #               name: github-pages
-  #               path: ${{ steps.create-apt-repo.outputs.dir }}
+  create_apt_repo:
+    name: Create APT repo
+    needs: install
+    if: ${{ ! env.ACT }}
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload-artifact.outputs.artifact-id }}
+      keyring: ${{ steps.create-apt-repo.outputs.keyring }}
+    steps:
+      - name: Retrieve package
+        uses: actions/download-artifact@v4
+        with:
+          name: debian_package_amd64
+      - uses: morph027/apt-repo-action@main
+        id: create-apt-repo
+        with:
+          repo-name: ${{ env.REPO_NAME }}
+          signing-key: ${{ secrets.GPG_OPENHEXA_PRIVATE_KEY }}
+          codename: ${{ env.CODENAME }}
+          components: ${{ env.COMPONENTS }}
+          architectures: ${{ env.ARCHITECTURES }}
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: ${{ steps.create-apt-repo.outputs.dir }}
+  deploy_apt_repo:
+    name: Publish apt repo with GitHub Pages
+    if: ${{ ! env.ACT }}
+    permissions:
+      id-token: write
+      pages: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: create_apt_repo
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Adding summary
+        run: |
+          echo ':rocket:' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo 'curl -sfLo /etc/apt.trusted.gpg.d/${{ needs.build.outputs.keyring }}.asc ${{ steps.deploy-pages.outputs.page_url }}gpg.key' >> $GITHUB_STEP_SUMMARY
+          echo 'echo "deb ${{ steps.deploy-pages.outputs.page_url }} ${{ env.CODENAME }} ${{ env.COMPONENTS }}" >/etc/apt/sources.list.d/${{ env.REPO_NAME }}.list' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY                
