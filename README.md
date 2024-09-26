@@ -152,7 +152,7 @@ You can install OpenHexa on your system and run it as a Systemd service
 First of all, you need to add our APT repository and GPG public key:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xlionjuan/apt-repo/refs/heads/main/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/openhexa.gpg
+curl -fsSL https://raw.githubusercontent.com/blsq/openhexa/refs/heads/main/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/openhexa.gpg
 echo "deb [signed-by=/usr/share/keyrings/openhexa.gpg] https://viz.bluesquare.org/openhexa/ bookworm main" | sudo tee /etc/apt/sources.list.d/openhexa.list
 ```
 
