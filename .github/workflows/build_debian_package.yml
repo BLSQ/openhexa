@@ -166,6 +166,7 @@ jobs:
     permissions:
       id-token: write
       pages: write
+    if: github.ref_name == 'main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

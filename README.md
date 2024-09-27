@@ -51,9 +51,9 @@ Quick Start
 -----------
 
 Requirements:
-- a least docker 26.1
+- a least [Docker 26.1](https://docs.docker.com/engine/install/debian/#install-using-the-repository)
 - Debian bookworm
-- Debian packages `gettext-base` `postgresql` `postgresql-14-postgis-3`
+- Debian packages `gettext-base`, `postgresql` (14+), `postgresql-<postgresql version>-postgis-3`
 - [yq](https://github.com/mikefarah/yq/#install)
 
 After having cloned this repo and change your current dir to it, you can check
@@ -139,15 +139,10 @@ The resulting package is available in the parent directory:
 #### Install
 
 Requirements:
-- a least docker 26.1
+- a least [Docker 26.1](https://docs.docker.com/engine/install/debian/#install-using-the-repository)
 - Debian bookworm
-- Debian packages `gettext-base`, `openssl`, `postgresql`,
-  `postgresql-14-postgis-3`
+- Systemd
 - [yq](https://github.com/mikefarah/yq/#install)
-
-You can install OpenHexa on your system and run it as a Systemd service
-`openhexa` (that you can then manage with `systemctl`).
-
 
 First of all, you need to add our APT repository and GPG public key:
 
@@ -156,12 +151,29 @@ curl -fsSL https://raw.githubusercontent.com/blsq/openhexa/refs/heads/main/pubke
 echo "deb [signed-by=/usr/share/keyrings/openhexa.gpg] https://viz.bluesquare.org/openhexa/ bookworm main" | sudo tee /etc/apt/sources.list.d/openhexa.list
 ```
 
+Make sure your locales are correctly set with `locale`. A common setup is
+
+```
+# Set locale
+sudo tee -a /etc/default/locale > /dev/null <<EOF
+LC_ALL=C.UTF-8
+LC_TYPE=C.UTF-8
+LC_MESSAGE=C.UTF-8
+LC_COLLATE=C.UTF-8
+EOF
+source /etc/default/locale
+```
+
 Then, you can update your APT database and install openhexa
 
 ```bash
 sudo apt update
 sudo apt install openhexa
 ```
+
+If you have Systemd, OpenHexa is run as a Systemd service `openhexa` (that you
+can then manage with `systemctl`). If you don't use Systemd, you can still run
+the service by running `/usr/share/openhexa/openhexa -g start`.
 
 #### Usage
 
