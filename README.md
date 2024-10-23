@@ -53,7 +53,7 @@ Quick Start
 Requirements:
 - a least [Docker 26.1](https://docs.docker.com/engine/install/debian/#install-using-the-repository)
 - Debian bookworm
-- Debian packages `gettext-base`, `postgresql` (14+), `postgresql-<postgresql version>-postgis-3`
+- Debian packages `gettext-base`, `postgresql` (14+), `postgresql-<postgresql version>-postgis-3`, `duplicity` (optional to manage backup and restore)
 - [yq](https://github.com/mikefarah/yq/#install)
 
 After having cloned this repo and change your current dir to it, you can check
@@ -171,6 +171,10 @@ sudo apt update
 sudo apt install openhexa
 ```
 
+If you want to manage backup and retore through our script, you can install it
+with recommended packages `sudo apt install --install-recommends openhexa`.
+
+
 If you have Systemd, OpenHexa is run as a Systemd service `openhexa` (that you
 can then manage with `systemctl`). If you don't use Systemd, you can still run
 the service by running `/usr/share/openhexa/openhexa -g start`.
@@ -224,6 +228,37 @@ During the setup, the following is done on the PostgreSQL side:
   with encrypted password authentication.
 - authorize `hexa-hub` to connect to `hexa-hub` from the entier Docker
   subnetwork with encrypted password authentication.
+
+##### Backup
+
+You can manage your backup and restore directly with OpenHexa. It will backup
+all the workspaces data, and all databases. This relies on the tool `duplicity`.
+Make sure that it is installed if you haven't installed it yet (if you install
+OpenHexa with `apt`, do it with the recommended packages).
+
+First, you need to set it up:
+
+```bash
+/usr/share/openhexa/setup.sh backup /mylocaldirecotry/where/to/do/thebackup/ encryption_passkey
+```
+
+Then you can back up the data with:
+
+```bash
+/usr/share/openhexa/openhexa.sh backup
+```
+
+Depending on the user activities, it might be a good idea to stop the service or
+simply redirect the website to a maintenance HTML page.
+
+To restore the data, you execute the following:
+
+```bash
+/usr/share/openhexa/openhexa.sh backup
+```
+
+In this case, we advise you to stop the service before performing a full
+restore.
 
 #### Configuration properties
 
