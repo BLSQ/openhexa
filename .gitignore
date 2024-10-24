@@ -3,3 +3,6 @@
 test-results/
 .secrets
 openhexa.nginx
+backup.conf*
+backup/
+workspaces-*

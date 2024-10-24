@@ -2,12 +2,17 @@
 
 COMPOSE_FILE_PATH="compose.yml"
 CONFIG_FILE_PATH=".env"
+BACKUP_CONFIG_FILE_PATH="backup.conf"
 WORKSPACE_DATA_DIRECTORY="workspaces"
 
 SUDO_COMMAND="sudo"
 
 function dot_env_file() {
   echo "${CONFIG_FILE_PATH}"
+}
+
+function backup_conf_file() {
+  echo "${BACKUP_CONFIG_FILE_PATH}"
 }
 
 function load_env() {
@@ -19,6 +24,7 @@ function setup() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
     COMPOSE_FILE_PATH="/usr/share/openhexa/compose.yml"
     CONFIG_FILE_PATH="/etc/openhexa/env.conf"
+    BACKUP_CONFIG_FILE_PATH="/etc/openhexa/backup.conf"
     WORKSPACE_DATA_DIRECTORY="/var/lib/openhexa/workspaces"
   fi
   if ((UID == 0)); then
@@ -42,6 +48,17 @@ function dist_dot_env_file() {
     current_env_file=".env.dist"
   fi
   echo "$current_env_file"
+}
+
+function get_backup_config() {
+  local variable_name=$1
+  local backup_file
+  if [[ -r "$(backup_conf_file)" ]] && backup_file=$(backup_conf_file); then
+    (
+      source "${backup_file}"
+      echo "${!variable_name}"
+    )
+  fi
 }
 
 function get_config_or_default() {
@@ -101,7 +118,11 @@ function parse_commandline() {
     esac
   done
   shift $((OPTIND - 1))
-  [[ -n $1 ]] && COMMAND="$1"
+  [[ -n $1 ]] && {
+    COMMAND="$1"
+    shift
+    COMMAND_PARAMETERS="$@"
+  }
 }
 
 function exit_properly() {
