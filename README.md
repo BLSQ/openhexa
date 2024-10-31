@@ -335,7 +335,7 @@ sudo nginx -t
 You need to update on OpenHexa config in `/etc/openhexa/env.conf`:
 
 ```bash
-TRUST_FORWARDED_PROTO="no"
+TRUST_FORWARDED_PROTO="false"
 PROXY_HOSTNAME_AND_PORT=example.com
 INTERNAL_BASE_URL=http://app:8000
 FRONTEND_PORT=3000
@@ -415,7 +415,7 @@ server {
 and in `/etc/openhexa/env.conf`
 
 ```bash
-TRUST_FORWARDED_PROTO="yes"
+TRUST_FORWARDED_PROTO="true"
 PROXY_HOSTNAME_AND_PORT=example.com
 INTERNAL_BASE_URL=http://app:8000
 FRONTEND_PORT=3000
