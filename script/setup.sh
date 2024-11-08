@@ -17,29 +17,73 @@ PGSQL_VERSION=$(postgresql_server_version)
 PGSQL_CLUSTER="openhexa"
 
 function usage() {
-  echo """
-  
-  Usage:    $0 [OPTIONS] COMMAND
+  if [[ -z $1 ]]; then
+    echo """
+    
+    Usage:    $0 [OPTIONS] COMMAND
 
-  OPTIONS:
+    OPTIONS:
 
-  -g        executes the OpenHexa command considering OpenHexa has bee globally
-            installed on the system. By default, it runs in its current working
-            directory
+    -g        executes the OpenHexa command considering OpenHexa has bee globally
+              installed on the system. By default, it runs in its current working
+              directory
 
-  -d        enables debug output            
+    -d        enables debug output            
 
-  COMMANDS:
+    COMMANDS:
 
-  all       sets up all: first the PostgreSQL database, then the environment
-  env       sets up the environment and stores it in a file (requires an
-            existing PostgreSQL cluster named \`openhexa\`)
-  db        sets up the PostgreSQL database
-  purge     stops OpenHexa and purges the configuration and the environment
-  check     checks installation
-  help      prints current usage documentation
-  version   prints current version
-  """
+    all       sets up all: first the PostgreSQL database, then the environment
+    env       sets up the environment and stores it in a file (requires an
+              existing PostgreSQL cluster named \`openhexa\`)
+    db        sets up the PostgreSQL database
+    purge     stops OpenHexa and purges the configuration and the environment
+    check     checks installation
+    backup    sets up backup (target location, encryption, frequency, rotation),
+              more details with \`help backup\`
+    help      prints current usage documentation
+    version   prints current version
+    """
+    return
+  fi
+  local cmd=$1
+  case $cmd in
+  backup)
+    echo """
+      
+    Usage:    backup LOCATION PASSPHRASE [OPTIONS]
+
+    LOCATION
+
+    This is the URL of the file server used to store the backup. The following
+    type of file servers are supported: local (file://), or SFTP (sftp://).
+    The file server AWS S3 (s3://) and Google Cloud Storage (gs://) are under
+    development.
+
+    PASSPHRASE
+
+    This is the passphrase to sign and encrypt the backup.
+
+    OPTIONS:
+
+    -f DAYS         the maximum number of days for incremental backup, once
+                    beyond it a full backup is performed
+
+    TYPE:
+
+    local
+    """
+    # To add when working
+    # -i ID           the required access key id for files servers Google Cloud Storage
+    #                 or AWS s3
+    # -s SECRET_KEY   the required secret access key for file servers Google Cloud
+    #                 Storage or AWS s3
+
+    ;;
+  *)
+    echo "The command ${cmd} is unknown."
+    usage
+    ;;
+  esac
 }
 
 LOCAL_FILES=(
@@ -501,6 +545,137 @@ function prompt_sudo_password_if_needed() {
   fi
 }
 
+function url_scheme() {
+  local location=$1
+  [[ $location =~ ^(([^:  /?#]+):) ]] && echo "${BASH_REMATCH[2]}"
+}
+
+function detect_file_server_type() {
+  local location=$1
+  scheme=$(url_scheme "${location}")
+  case $scheme in
+  # file | s3 | gs | sftp)
+  file | sftp)
+    echo "${scheme}"
+    ;;
+  *)
+    echo "The scheme \`${scheme}\` is not supported. Supported file server types are:"
+    echo "local file systeme (file://), and SFTP (sftp://)."
+    # AWS S3 (s3://), Google Cloud Storage (gs://),
+    exit 1
+    ;;
+  esac
+}
+
+function is_duplicity_installed() {
+  local version major minor
+  duplicity --help >/dev/null 2>&1 || return 1
+  version=$(duplicity --version | sed -e "s/duplicity //")
+  major=$(echo "${version}" | cut -d. -f1)
+  minor=$(echo "${version}" | cut -d. -f2)
+  patch=$(echo "${version}" | cut -d. -f3)
+  ((major == 0)) && ((minor < 8)) && return 1
+  ((major == 0)) && ((minor == 8)) && ((patch < 22)) && return 1
+  return 0
+}
+
+function is_duplicity_dependency_installed() {
+  echo -n "- Duplicity 0.8.22+ (required for backup and restore) ... "
+  if is_duplicity_installed; then
+    echo "installed"
+    return 0
+  else
+    echo "not installed (Do \`apt install duplicity\`)"
+    return 1
+  fi
+}
+
+function generate_or_update_backup_config() {
+  if ! is_duplicity_installed; then
+    echo "Duplicity 0.8.22 at least is required. Please install it with"
+    echo "\`apt install duplicity\`"
+    return 1
+  fi
+  local location passphrase access_key_id secret_access_key oldest_full_age
+  if [[ -z $1 ]]; then
+    echo "LOCATION is missing"
+    usage backup
+    exit 1
+  fi
+
+  if [[ -z $2 ]] || [[ $# -eq 3 ]] && [[ $2 =~ ^-[f] ]]; then
+    echo "PASSPHRASE is missing"
+    usage backup
+    exit 1
+  fi
+
+  location=$1
+  passphrase=$2
+  shift 2
+
+  # while getopts "i:s:f:" flag; do
+  while getopts "f:" flag; do
+    case "${flag}" in
+    # i)
+    #   access_key_id="${OPTARG}"
+    #   ;;
+    # s)
+    #   secret_access_key="${OPTARG}"
+    #   ;;
+    f)
+      oldest_full_age="${OPTARG}"
+      ;;
+    *)
+      usage backup
+      exit_properly 1
+      ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+  local type
+  type=$(detect_file_server_type "${location}")
+  echo "- file server location: ${location}"
+  echo "- file server type detected: ${type}"
+  # case $type in
+  # s3 | gs)
+  #   if [[ -z $access_key_id ]] || [[ -z $secret_access_key ]]; then
+  #     echo "With file server types AWS S3 or Google Cloud Storage, the access key id"
+  #     echo "and the secret access key have to be passed:"
+  #     echo "backup LOCATION -i <ACCESS_KEY_ID> -s <SECRET_ACCESS_KEY>"
+  #     exit 1
+  #   else
+  #     echo "- access key ID and secret have been provided"
+  #   fi
+  #   ;;
+  # *) ;;
+  # esac
+
+  if [[ -n $oldest_full_age ]]; then
+    ((oldest_full_age <= 0)) && {
+      echo "The number of days before refreshing the backup with a full one should be"
+      echo "positive, but \`${oldest_full_age}\` has been passed"
+      exit 1
+    }
+    echo "- maximum period of incremental backup is ${oldest_full_age} days"
+  fi
+
+  if [[ -r $(backup_conf_file) ]]; then
+    local copy_of_backup_conf
+    copy_of_backup_conf="$(backup_conf_file).bck-$(date -Iseconds)"
+    echo "- copy the existing backup config file \`${copy_of_backup_conf}\`"
+    cp "$(backup_conf_file)" "${copy_of_backup_conf}"
+  fi
+  echo "- generate the config file OK"
+  cat >"$(backup_conf_file)" <<EOF
+TYPE=${type}
+LOCATION=${location}
+PASSPHRASE=${passphrase}
+ACCESS_KEY_ID=${access_key_id}
+SECRET_KEY_ID=${secret_access_key}
+OLDEST_FULL_BCK_AGE=${oldest_full_age}
+EOF
+}
+
 function execute() {
   local command=$1
   local exit_code=0
@@ -536,7 +711,12 @@ function execute() {
     is_docker_dependency_installed || exit_code=1
     is_docker_engine_running || exit_code=1
     is_postgresql_service_running || exit_code=1
+    is_duplicity_installed
     exit_properly $exit_code
+    ;;
+  backup)
+    echo "Setup backup:"
+    generate_or_update_backup_config $COMMAND_PARAMETERS
     ;;
   help)
     usage
