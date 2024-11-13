@@ -108,6 +108,13 @@ jobs:
           sudo dpkg -i openhexa_*_amd64.deb
           /usr/share/openhexa/setup.sh -g check
 
+      - name: Setup OpenHexa if run locally
+        if: ${{ env.ACT }}
+        run: |
+          set -x
+          sed -i -e "s%^.*WORKSPACE_STORAGE_LOCATION=.*$%WORKSPACE_STORAGE_LOCATION=\"${GITHUB_WORKSPACE}/workspaces\"%" /etc/openhexa/env.conf
+          set +x
+
       - name: Start OpenHexa if run locally
         if: ${{ env.ACT }}
         run: /usr/share/openhexa/openhexa.sh -g start
@@ -116,13 +123,14 @@ jobs:
 
       - name: Install smoke tests dependencies
         working-directory: ./smoke-tests
-        run: npm ci
+        run: |
+          npm ci
 
       - name: Build smoke tests image
         working-directory: ./smoke-tests
         run: docker build -t openhexa/smoke-tests .
-      # - name: Run smoke tests
-      #   run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
+      - name: Run smoke tests
+        run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
       - name: Keep test results
         uses: actions/upload-artifact@v4
         with:
@@ -145,10 +153,12 @@ jobs:
       keyring: ${{ steps.create-apt-repo.outputs.keyring }}
     steps:
       - name: Retrieve package
+        if: ${{ ! env.ACT }}
         uses: actions/download-artifact@v4
         with:
           name: debian_package_amd64
       - uses: morph027/apt-repo-action@main
+        if: ${{ ! env.ACT }}
         id: create-apt-repo
         with:
           repo-name: ${{ env.REPO_NAME }}
@@ -157,6 +167,7 @@ jobs:
           components: ${{ env.COMPONENTS }}
           architectures: ${{ env.ARCHITECTURES }}
       - name: Upload Pages artifact
+        if: ${{ ! env.ACT }}
         uses: actions/upload-pages-artifact@v3
         with:
           name: github-pages
@@ -174,9 +185,11 @@ jobs:
     needs: create_apt_repo
     steps:
       - name: Deploy to GitHub Pages
+        if: ${{ ! env.ACT }}
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Adding summary
+        if: ${{ ! env.ACT }}
         run: |
           echo ':rocket:' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
