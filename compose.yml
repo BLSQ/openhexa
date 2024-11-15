@@ -42,7 +42,7 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     healthcheck:
-      test: curl "http://localhost:8000/ready" || exit 1
+      test: curl "http://app:8000/ready" || exit 1
       interval: "60s"
       timeout: "3s"
       start_period: "5s"
@@ -113,7 +113,7 @@ services:
 
   jupyterhub:
     platform: linux/amd64
-    image: blsq/openhexa-jupyterhub:local-2024.09.19
+    image: blsq/openhexa-jupyterhub:local-2024.11.15
     command: ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_dev_config.py"]
     container_name: jupyterhub
     networks:
@@ -149,7 +149,7 @@ services:
       LOAD_DEV_CONFIG: "true"
       # Networking
       ############
-      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' ${PUBLIC_HOSTNAME:-localhost}:*"
+      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' ${PROXY_HOSTNAME_AND_PORT:-localhost}:*"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
