@@ -1,5 +1,3 @@
-#!/bin/bash
-
 COMPOSE_FILE_PATH="compose.yml"
 CONFIG_FILE_PATH=".env"
 BACKUP_CONFIG_FILE_PATH="backup.conf"

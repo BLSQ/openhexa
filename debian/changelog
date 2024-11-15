@@ -1,5 +1,17 @@
-openhexa (1.0-1) UNRELEASED; urgency=low
+openhexa (1.0-2) UNRELEASED; urgency=high
+
+  * Fix CORS WSS bug when browsing notebook and running cell
+    (Closes: #HEXA-1093)
+
+ -- Christophe Philemotte <cphilemotte@bluesquarehub.com>  Fri, 15 Nov 2024 11:12:31 +0100
+
+openhexa (1.0-1) stable; urgency=low
 
   * Initial release. (Closes: #HEXA-980)
+  * Include JupyterHub
+  * Depend on Debian PostgreSQL service
+  * Remove minio and use local storage backend
+  * Make notebook image configurable
+  * Add script commands to backup and restore DB and assets
 
- -- Christophe Philemotte <cphilemotte@bluesquarehub.com>  Tue, 2 Jul 2024 16:00:00 +0200
+ -- Christophe Philemotte <cphilemotte@bluesquarehub.com>  Fri, 15 Nov 2024 11:12:06 +0100
