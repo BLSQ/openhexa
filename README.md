@@ -110,6 +110,10 @@ You can update openhexa with
 
 ### Debian Package
 
+#### Release, changelog, and versions
+
+
+
 #### Build
 
 To build the Debian package, you need to run on a Debian like Linux distribution

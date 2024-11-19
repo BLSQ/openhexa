@@ -1,9 +1,10 @@
-openhexa (1.0-2) UNRELEASED; urgency=high
+openhexa (1.0-2ubuntu1) UNRELEASED; urgency=high
 
   * Fix CORS WSS bug when browsing notebook and running cell
     (Closes: #HEXA-1093)
+  * Set version of app to 0.74.7 and notebook to 1.4.5
 
- -- Christophe Philemotte <cphilemotte@bluesquarehub.com>  Fri, 15 Nov 2024 11:12:31 +0100
+ -- Christophe Philemotte <cphilemotte@bluesquarehub.com>  Tue, 19 Nov 2024 14:35:44 +0100
 
 openhexa (1.0-1) stable; urgency=low
 
