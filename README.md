@@ -112,7 +112,30 @@ You can update openhexa with
 
 #### Release, changelog, and versions
 
+The vesions are described into the [changelog file](debian/changelog). The last
+one is unreleased and is the one that is published. To manage versions and
+changelog, we use the debhelper tool `dch`.
 
+To add a new change, do:
+
+```bash
+EMAIL="firstname lastname <email@address.org>" dch -a
+```
+
+This will open your favorite editor so you can edit the changelog. Save, commit,
+push, and GitHub Actions will do the rest.
+
+To release a version, do:
+
+```bash
+EMAIL="firstname lastname <email@address.org>" dch -rD stable
+```
+
+To add a new unreleased version do
+
+```bash
+EMAIL="firstname lastname <email@address.org>" dch -i -D UNRELEASED -U
+```
 
 #### Build
 

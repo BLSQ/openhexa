@@ -1,4 +1,4 @@
-openhexa (1.0-2ubuntu1) UNRELEASED; urgency=high
+openhexa (1.0-2) UNRELEASED; urgency=high
 
   * Fix CORS WSS bug when browsing notebook and running cell
     (Closes: #HEXA-1093)
