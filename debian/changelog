@@ -1,10 +1,14 @@
-openhexa (1.0-2) UNRELEASED; urgency=high
+openhexa (1.0-3) stable; urgency=high
 
+  [ Christophe Philemotte ]
   * Fix CORS WSS bug when browsing notebook and running cell
     (Closes: #HEXA-1093)
   * Set version of app to 0.74.7 and notebook to 1.4.5
 
- -- Christophe Philemotte <cphilemotte@bluesquarehub.com>  Tue, 19 Nov 2024 14:35:44 +0100
+  [ Quentin Gérôme ]
+  * Update the frontend to 0.54.4. You need to add this to your .env `MAX_REQUEST_BODY_SIZE=5gb`
+
+ -- Quentin Gérôme <qgerome@bluesquarehub.com>  Wed, 15 Jan 2025 13:19:25 +0100
 
 openhexa (1.0-1) stable; urgency=low
 
