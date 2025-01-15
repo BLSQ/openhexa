@@ -49,7 +49,7 @@ services:
       retries: 3
   
   frontend:
-    image: "blsq/openhexa-frontend:0.54.2"
+    image: "blsq/openhexa-frontend:0.54.4"
     platform: linux/amd64
     networks:
       - openhexa
