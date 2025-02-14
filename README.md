@@ -306,6 +306,7 @@ In order to be able to send mails to users, you have to provide the configuratio
 - `EMAIL_PORT`
 - `EMAIL_HOST_USER`
 - `EMAIL_USE_TLS`
+- `EMAIL_USE_SSL`
 - `EMAIL_HOST_PASSWORD`
 
 
