@@ -110,9 +110,23 @@ You can update openhexa with
 
 ### Debian Package
 
+#### Requirements
+
+To release and build the Debian package, you need to run on a Debian like Linux distribution
+and the following packages are required: `devscripts`, `debhelper`,
+`build-essential`. To install them, run the following command:
+
+```bash
+sudo apt install devscripts debhelper build-essential
+```
+
+Notice this requires super user right (that's what `sudo` gives you).
+
+
+
 #### Release, changelog, and versions
 
-The vesions are described into the [changelog file](debian/changelog). The last
+The versions are described into  the [changelog file](debian/changelog). The last
 one is unreleased and is the one that is published. To manage versions and
 changelog, we use the debhelper tool `dch`.
 
@@ -138,16 +152,6 @@ EMAIL="firstname lastname <email@address.org>" dch -i -D UNRELEASED -U
 ```
 
 #### Build
-
-To build the Debian package, you need to run on a Debian like Linux distribution
-and the following packages are required: `devscripts`, `debhelper`,
-`build-essential`. To install them, run the following command:
-
-```bash
-sudo apt install devscripts debhelper build-essential
-```
-
-Notice this requires super user right (that's what `sudo` gives you).
 
 When all the requirements are met, run the following script to build the
 package:
