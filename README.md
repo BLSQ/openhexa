@@ -312,6 +312,7 @@ In order to be able to send mails to users, you have to provide the configuratio
 - `EMAIL_USE_TLS`
 - `EMAIL_USE_SSL`
 - `EMAIL_HOST_PASSWORD`
+- `DEFAULT_FROM_EMAIL`
 
 
 #### Test
