@@ -2,7 +2,7 @@
    <img alt="OpenHEXA Logo" src="https://raw.githubusercontent.com/BLSQ/openhexa-app/main/hexa/static/img/logo/logo_with_text_grey.svg" height="80">
 </div>
 <p align="center">
-    <em>Open-source Data integration platform</em>
+    <em>Open-source data integration and analysis platform</em>
 </p>
 
 [![build_debian_package](https://github.com/BLSQ/openhexa/actions/workflows/build_debian_package.yml/badge.svg)](https://github.com/BLSQ/openhexa/actions/workflows/build_debian_package.yml)
@@ -10,7 +10,7 @@
 OpenHEXA
 ========
 
-OpenHEXA is an open-source data integration platform developed by [Bluesquare](https://bluesquarehub.com).
+OpenHEXA is an open-source data integration and data analysis platform developed by [Bluesquare](https://bluesquarehub.com).
 
 Its goal is to facilitate data integration and analysis workflows, in particular in the context of public health projects.
 
