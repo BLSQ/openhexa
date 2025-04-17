@@ -427,35 +427,36 @@ function setup_db() {
   echo -n "- create cluster if it does not exists ... "
   if ! does_postgresql_cluster_openhexa_exist; then
     create_pgsql_cluster
+    echo "created"
+    
+    echo -n "- make the cluster listening on the Docker network ... "
+    listen_on_docker_network
+    echo "done"
+
+    echo -n "- allow access to the cluster from the docker network ... "
+    allow_access_from_docker "$(docker_bridge_gateway_subnet)" all all
+    echo "done"
+
+    echo -n "- restart the cluster to take in account new setup ... "
+    restart_postgreql
+    echo "done"
+
+    echo -n "- create users and databases for the Open Hexa app and Jupyter Hub ... "
+    db_port=$(get_postgresql_port_for_cluster_openhexa)
+    create_postgresql_user "${db_port}" "$(get_config_or_default DATABASE_USER)" "$(get_config_or_default DATABASE_PASSWORD)"
+    create_postgresql_db "${db_port}" "$(get_config_or_default DATABASE_NAME)" "$(get_config_or_default DATABASE_USER)"
+    create_postgresql_user "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)" "$(get_config_or_default JUPYTERHUB_DATABASE_PASSWORD)"
+    create_postgresql_db "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_NAME)" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)"
+    echo "done"
+  else
+    echo "already created"
   fi
-  echo "created"
 
   echo -n "- check the cluster is running ... "
   if ! is_postgresql_service_running >/dev/null 2>&1; then
     restart_postgreql
   fi
   echo "running"
-
-  db_port=$(get_postgresql_port_for_cluster_openhexa)
-
-  echo -n "- make the cluster listening on the Docker network ... "
-  listen_on_docker_network
-  echo "done"
-
-  echo -n "- allow access to the cluster from the docker network ... "
-  allow_access_from_docker "$(docker_bridge_gateway_subnet)" all all
-  echo "done"
-
-  echo -n "- restart the cluster to take in account new setup ... "
-  restart_postgreql
-  echo "done"
-
-  echo -n "- create users and databases for the Open Hexa app and Jupyter Hub ... "
-  create_postgresql_user "${db_port}" "$(get_config_or_default DATABASE_USER)" "$(get_config_or_default DATABASE_PASSWORD)"
-  create_postgresql_db "${db_port}" "$(get_config_or_default DATABASE_NAME)" "$(get_config_or_default DATABASE_USER)"
-  create_postgresql_user "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)" "$(get_config_or_default JUPYTERHUB_DATABASE_PASSWORD)"
-  create_postgresql_db "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_NAME)" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)"
-  echo "done"
 }
 
 function remove_user_and_group() {
