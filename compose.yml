@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:0.74.11"
+    image: "blsq/openhexa-app:1.2.4"
     platform: linux/amd64
     networks:
       - openhexa
@@ -49,7 +49,7 @@ services:
       retries: 3
   
   frontend:
-    image: "blsq/openhexa-frontend:0.54.4"
+    image: "blsq/openhexa-frontend:1.2.4"
     platform: linux/amd64
     networks:
       - openhexa
