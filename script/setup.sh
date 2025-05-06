@@ -343,8 +343,8 @@ OPENHEXA_GROUP=openhexa
 
 function setup_user() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
-    $SUDO_COMMAND addgroup --system --gid 1000 "${OPENHEXA_GROUP}"
-    $SUDO_COMMAND adduser --system --uid 1000 --ingroup "${OPENHEXA_GROUP}" "${OPENHEXA_USER}"
+    $SUDO_COMMAND addgroup --system "${OPENHEXA_GROUP}"
+    $SUDO_COMMAND adduser --system --ingroup "${OPENHEXA_GROUP}" "${OPENHEXA_USER}"
     $SUDO_COMMAND usermod -a -G docker "${OPENHEXA_USER}"
   fi
 }
@@ -352,10 +352,10 @@ function setup_user() {
 function setup_local_storage() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
     $SUDO_COMMAND mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
-    $SUDO_COMMAND chown 1000:1000 "${WORKSPACE_DATA_DIRECTORY}"
+    $SUDO_COMMAND chown $(id -u openhexa):$(id -g openhexa) "${WORKSPACE_DATA_DIRECTORY}"
   else
     mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
-    chmod 777 "${WORKSPACE_DATA_DIRECTORY}"
+    chmod 770 "${WORKSPACE_DATA_DIRECTORY}"
   fi
 }
 

@@ -106,7 +106,15 @@ jobs:
       - name: Install OpenHexa
         run: |
           sudo dpkg -i openhexa_*_amd64.deb
+      
+      - name: Check OpenHexa status
+        run: |
+          sudo systemctl status openhexa.service
           /usr/share/openhexa/setup.sh -g check
+
+      - name: Check OpenHexa logs
+        run: |
+          sudo journalctl -xeu openhexa.service
 
       - name: Setup OpenHexa if run locally
         if: ${{ env.ACT }}

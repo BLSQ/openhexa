@@ -9,6 +9,7 @@ x-app: &common
       - openhexa
     extra_hosts:
       db: host-gateway
+    user: ${OH_UID}:${OH_GID} # Will be the `openhexa` user set in the openhexa.service
     volumes:
       - "${WORKSPACE_STORAGE_LOCATION}:/data"
     env_file:

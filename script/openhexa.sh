@@ -31,7 +31,7 @@ function usage() {
     ps          reports running services
     config      reports the config used
     update      pulls last container images
-    prepare     runs database migrations and installs fixtures
+    prepare     runs databases migrations and installs fixtures
     logs        gets all the logs
     backup      backs up OpenHexa
     restore     restores OpenHexa, more details with \`help restore\`
@@ -288,6 +288,7 @@ function execute() {
     ;;
   prepare)
     run_compose_with_profiles run app fixtures
+    run_compose_with_profiles run jupyterhub jupyterhub upgrade-db
     exit_properly 0
     ;;
   logs)
