@@ -352,10 +352,10 @@ function setup_user() {
 function setup_local_storage() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
     $SUDO_COMMAND mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
-    $SUDO_COMMAND chown "${OPENHEXA_USER}:${OPENHEXA_GROUP}" "${WORKSPACE_DATA_DIRECTORY}"
+    $SUDO_COMMAND chown $(id -u openhexa):$(id -g openhexa) "${WORKSPACE_DATA_DIRECTORY}"
   else
     mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
-    chmod 777 "${WORKSPACE_DATA_DIRECTORY}"
+    chmod 770 "${WORKSPACE_DATA_DIRECTORY}"
   fi
 }
 
@@ -363,7 +363,7 @@ function generate_django_secret_key() {
   # see https://github.com/django/django/blob/07a4d23283586bc4578eb9c82a7ad14af3724057/django/core/management/utils.py#L79
   # for implementation
   # $ has been removed to avoid bash substitution
-  head -c 8192 /dev/urandom | LC_ALL=C tr -dc 'abcdefghijklmnopqrstuvwxyz0123456789!@#%^&*(-_=+)$' | head -c 50
+  head -c 8192 /dev/urandom | LC_ALL=C tr -dc 'abcdefghijklmnopqrstuvwxyz0123456789!@#%^&*(-_=)$' | head -c 50
 }
 
 function generate_fernet_encryption_key() {

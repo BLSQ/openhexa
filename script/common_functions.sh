@@ -81,12 +81,18 @@ function get_proxy_url() {
 
 function run_compose() {
   local proxy_url
+  local oh_uid
+  local oh_gid
   proxy_url=$(get_proxy_url)
+  oh_uid=$(id -u openhexa)
+  oh_gid=$(id -g openhexa)
   OPENHEXA_CONF_FILE="${CONFIG_FILE_PATH}" \
     NEW_FRONTEND_DOMAIN="${proxy_url}" \
     NOTEBOOKS_URL="${proxy_url}" \
     CORS_ALLOWED_ORIGINS="${proxy_url}" \
     CORS_TRUSTED_ORIGINS="${proxy_url}" \
+    OH_UID="${oh_uid}" \
+    OH_GID="${oh_gid}" \
     docker compose \
     --env-file "${CONFIG_FILE_PATH}" \
     --file "${COMPOSE_FILE_PATH}" \
