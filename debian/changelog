@@ -1,9 +1,28 @@
+openhexa (1.0-6.1) UNRELEASED; urgency=medium
+
+  * Non-maintainer upload.
+  * gerome <qgerome@bluesquarehub.com>
+  * gerome <qgerome@bluesquarehub.com>
+  * stable
+  * stable
+  * stable
+  * stable
+
+ -- root <quentin>  Wed, 07 May 2025 12:55:43 +0000
+
 openhexa (1.0-6) stable; urgency=medium
 
   [ Quentin Gérôme ]
   * bump images, use rootless images
 
  -- Quentin Gérôme <qgerome@bluesquarehub.com>  Wed, 7 May 2025 14:22:38 +0100
+
+openhexa (1.0-5.1) UNRELEASED; urgency=medium
+
+  * Non-maintainer upload.
+  * build
+
+ -- quentin gerome <qgerome@bluesquarehub.com>  Wed, 07 May 2025 12:29:06 +0000
 
 openhexa (1.0-5) stable; urgency=medium
 
