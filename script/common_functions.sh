@@ -83,9 +83,11 @@ function run_compose() {
   local proxy_url
   local oh_uid
   local oh_gid
+  local docker_gid
   proxy_url=$(get_proxy_url)
   oh_uid=$(id -u openhexa)
   oh_gid=$(id -g openhexa)
+  docker_gid=$(getent group docker | cut -d: -f3)
   OPENHEXA_CONF_FILE="${CONFIG_FILE_PATH}" \
     NEW_FRONTEND_DOMAIN="${proxy_url}" \
     NOTEBOOKS_URL="${proxy_url}" \
@@ -93,6 +95,7 @@ function run_compose() {
     CORS_TRUSTED_ORIGINS="${proxy_url}" \
     OH_UID="${oh_uid}" \
     OH_GID="${oh_gid}" \
+    DOCKER_GID="${docker_gid}" \
     docker compose \
     --env-file "${CONFIG_FILE_PATH}" \
     --file "${COMPOSE_FILE_PATH}" \
@@ -103,7 +106,6 @@ function run_compose() {
 function run_compose_with_profiles() {
   run_compose \
     --profile frontend \
-    --profile minio \
     --profile pipelines \
     --profile notebook \
     $@

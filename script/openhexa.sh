@@ -288,7 +288,7 @@ function execute() {
     ;;
   prepare)
     run_compose_with_profiles run app fixtures
-    run_compose_with_profiles run jupyterhub jupyterhub upgrade-db
+    run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0
     ;;
   logs)
@@ -307,9 +307,8 @@ function execute() {
     usage $COMMAND_PARAMETERS
     exit_properly 0
     ;;
-  version)
-    echo "OpenHexa 1.0"
-    exit_properly 0
+  compose)
+    run_compose_with_profiles "$COMMAND_PARAMETERS"
     ;;
   *)
     usage

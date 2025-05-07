@@ -122,6 +122,14 @@ sudo apt install devscripts debhelper build-essential
 
 Notice this requires super user right (that's what `sudo` gives you).
 
+If you are not on a debian based distribution, you can use the `Dockerfile.build` to build a debian container that will do the job for you.
+
+```bash
+docker build --platform linux/amd64 -t openhexa-build -f Dockerfile.build .
+docker run -it openhexa-build
+```
+
+You can then follow the instructions below to build the package as usual.
 
 
 #### Release, changelog, and versions

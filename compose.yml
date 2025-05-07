@@ -9,7 +9,7 @@ x-app: &common
       - openhexa
     extra_hosts:
       db: host-gateway
-    user: ${OH_UID}:${OH_GID} # Will be the `openhexa` user set in the openhexa.service
+    user: ${OH_UID:-1000}:${OH_GID:-1000} # Will be the `openhexa` user set in the openhexa.service
     volumes:
       - "${WORKSPACE_STORAGE_LOCATION}:/data"
     env_file:
@@ -83,6 +83,8 @@ services:
     restart: unless-stopped
     profiles:
       - "pipelines"
+    group_add:
+      - "${DOCKER_GID:-994}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
@@ -153,6 +155,8 @@ services:
       CONTENT_SECURITY_POLICY: "frame-ancestors 'self' ${PROXY_HOSTNAME_AND_PORT:-localhost}:*"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-994}"
     ports:
       - ${JUPYTERHUB_PORT:-8001}:8000
     extra_hosts:

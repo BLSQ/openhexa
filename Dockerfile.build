@@ -1,11 +1,12 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
-    apt-get install -y devscripts debhelper build-essential && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y devscripts debhelper build-essential nano && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
 COPY . /work
 
 WORKDIR /work 
 
-ENTRYPOINT [ "bash", "script/build.sh" ]
+ENTRYPOINT [ "/bin/bash" ]

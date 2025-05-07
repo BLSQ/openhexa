@@ -1,12 +1,7 @@
 #!/bin/bash
 
 # script/build: build the debian package
-
-COMMAND="help"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-
 # shellcheck source=script/common_functions.sh
-source "${SCRIPT_DIR}/common_functions.sh"
 
 function is_package_installed() {
   local package_name=$1
@@ -39,50 +34,14 @@ function check_requirements_or_exit() {
   done
 }
 
-function build_package() {
-  echo "> Clean working directory"
-  dh_clean
-  echo "> Build package"
-  debuild -us -uc
-  echo "> Create build directory"
-  mkdir -p build
-  echo "> Copy package to build directory"
-  cp ../*.deb build/
-  echo "> Clean working directory"
-  dh_clean
-}
-
-function release_package() { 
-  # local email="${COMMAND_PARAMETERS%% *}"
-  # if [[ -z "${email}" ]]; then
-  #   echo "Error: email is required"
-  #   echo "e.g. \"Quentin Gérôme <qgerome@bluesquarehub.com>\""
-  #   exit 1
-  # fi
-  echo "> Release package"
-  # echo "  Email: ${email}"
-  echo "${COMMAND_PARAMETERS}"
-  EMAIL="${email}" dch "${COMMAND_PARAMETERS#* }"
-}
-function execute() {
-  local command=$1
-  local exit_code=0
-  case "${command}" in
-  build)
-    build_package
-    exit_properly 0
-    ;;
-  release)
-    release_package
-    exit_properly 0
-    ;;
-  *)
-    ;;
-  esac
-}
-
 set -e
-
-check_requirements_or_exit
-parse_commandline "$@"
-execute "$COMMAND"
+echo "> Clean working directory"
+dh_clean
+echo "> Build package"
+debuild -us -uc
+echo "> Create build directory"
+mkdir -p build
+echo "> Copy package to build directory"
+cp ../*.deb build/
+echo "> Clean working directory"
+dh_clean
