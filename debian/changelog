@@ -3,7 +3,7 @@ openhexa (1.0-6) stable; urgency=medium
   [ Quentin Gérôme ]
   * bump images, use rootless images
 
--- Quentin Gérôme <qgerome@bluesquarehub.com>  Wed, 7 May 2025 14:22:38 +0100
+ -- Quentin Gérôme <qgerome@bluesquarehub.com>  Wed, 7 May 2025 14:22:38 +0100
 
 openhexa (1.0-5) stable; urgency=medium
 
