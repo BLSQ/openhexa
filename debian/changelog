@@ -1,3 +1,11 @@
+openhexa (1.0-6.1) stable; urgency=medium
+
+  [ Quentin Gerome ]
+  * Fix upgrade-db for Jupyterhub
+  * Fix pipeline runner to have permission to use docker api
+
+ -- Quentin Gerome <qgerome@bluesquarehub.com>  Wed, 07 May 2025 15:15:10 +0000
+
 openhexa (1.0-6) stable; urgency=medium
 
   [ Quentin Gérôme ]

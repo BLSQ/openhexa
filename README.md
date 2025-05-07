@@ -126,7 +126,7 @@ If you are not on a debian based distribution, you can use the `Dockerfile.build
 
 ```bash
 docker build --platform linux/amd64 -t openhexa-build -f Dockerfile.build .
-docker run -it openhexa-build
+docker run -it -v $(pwd):/work openhexa-build
 ```
 
 You can then follow the instructions below to build the package as usual.
