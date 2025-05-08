@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # script/build: build the debian package
+# shellcheck source=script/common_functions.sh
 
 function is_package_installed() {
   local package_name=$1
@@ -34,12 +35,13 @@ function check_requirements_or_exit() {
 }
 
 set -e
-
-cd "$(dirname "$0")/.."
-
-check_requirements_or_exit
-
 echo "> Clean working directory"
 dh_clean
 echo "> Build package"
 debuild -us -uc
+echo "> Create build directory"
+mkdir -p build
+echo "> Copy package to build directory"
+cp ../*.deb build/
+echo "> Clean working directory"
+dh_clean

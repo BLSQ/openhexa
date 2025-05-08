@@ -1,5 +1,5 @@
 <div align="center">
-   <img alt="OpenHEXA Logo" src="https://raw.githubusercontent.com/BLSQ/openhexa-app/main/hexa/static/img/logo/logo_with_text_grey.svg" height="80">
+   <img alt="OpenHEXA Logo" src="https://raw.githubusercontent.com/BLSQ/openhexa-app/main/backend/hexa/static/img/logo/logo_with_text_black.svg" height="80">
 </div>
 <p align="center">
     <em>Open-source data integration and analysis platform</em>
@@ -122,6 +122,14 @@ sudo apt install devscripts debhelper build-essential
 
 Notice this requires super user right (that's what `sudo` gives you).
 
+If you are not on a debian based distribution, you can use the `Dockerfile.build` to build a debian container that will do the job for you.
+
+```bash
+docker build --platform linux/amd64 -t openhexa-build -f Dockerfile.build .
+docker run -it -v $(pwd):/work openhexa-build
+```
+
+You can then follow the instructions below to build the package as usual.
 
 
 #### Release, changelog, and versions
