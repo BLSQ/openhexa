@@ -10,14 +10,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "${SCRIPT_DIR}/common_functions.sh"
 
 function usage() {
-  if [[ -z $1 ]]; then
+  local cmd=$1
+  if [[ -z $cmd ]]; then
     echo """
     
     Usage:    $0 [OPTIONS] COMMAND
 
     OPTIONS:
 
-    -g        executes the OpenHexa command considering OpenHexa has bee globally
+    -g        executes the OpenHexa command considering OpenHexa has been globally
               installed on the system. By default, it runs in its current working
               directory
 
@@ -34,29 +35,12 @@ function usage() {
     prepare     runs databases migrations and installs fixtures
     logs        gets all the logs
     backup      backs up OpenHexa
-    restore     restores OpenHexa, more details with \`help restore\`
+    restore     restores OpenHexa.
     help [cmd]  prints current usage documentation or of the given command \`cmd\`
     version     prints current version
     """
     return
   fi
-  local cmd=$1
-  case $cmd in
-  restore)
-    echo """
-      
-    Usage:    restore [OPTIONS]
-
-    OPTIONS: none
-    """
-    # -c        retrieves the backup and checks them, but does not restore it
-    #           in place
-    ;;
-  *)
-    echo "The command ${cmd} is unknown."
-    usage
-    ;;
-  esac
 }
 
 function list_of_services() {
@@ -304,13 +288,14 @@ function execute() {
     exit_properly $?
     ;;
   help)
-    usage $COMMAND_PARAMETERS
+    usage
     exit_properly 0
     ;;
   compose)
     run_compose_with_profiles "$COMMAND_PARAMETERS"
     ;;
   *)
+    echo "The command ${command} is unknown."
     usage
     exit_properly 1
     ;;
