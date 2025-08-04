@@ -380,6 +380,11 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
+    # Routes all /user/account requests directly to the frontend to avoid redirection to /hub/user/account and fix the invitation issue   
+    location ~ ^/user/account(/.*) {
+        proxy_pass http://localhost:3000;
+    }
+
     location ~ ^/(?<root_path>hub|user)(?<path>/.*)? {
         rewrite ^ /$root_path$path break;
         proxy_pass http://localhost:8001;
@@ -466,6 +471,11 @@ server {
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
     add_header X-XSS-Protection "1; mode=block";
+    
+    # Routes all /user/account requests directly to the frontend to avoid redirection to /hub/user/account and fix the invitation issue   
+    location ~ ^/user/account(/.*) {
+        proxy_pass http://localhost:3000;
+    }
 
     location ~ ^/(?<root_path>hub|user)(?<path>/.*)? {
         rewrite ^ /$root_path$path break;
@@ -479,7 +489,6 @@ server {
 
         proxy_buffering off;
     }
-
 
     location / {
         proxy_pass http://localhost:3000;
@@ -497,3 +506,141 @@ INTERNAL_BASE_URL=http://app:8000
 FRONTEND_PORT=3000
 JUPYTERHUB_PORT=8001
 ```
+
+Then, restart Nginx and OpenHexa:
+
+```bash
+sudo systemctl restart openhexa nginx
+```
+
+You can browse now OpenHexa app at `https://example.com`.
+
+#### Publish OpenHexa through a Apache proxy
+
+##### Without TLS/SSL
+
+Create a file `/etc/apache2/sites-available/openhexa.conf` with the following content
+(replace `example.com` with your domain name):
+
+```
+<VirtualHost *:80>
+  ServerName example.com
+
+  ProxyPreserveHost On
+  RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
+  
+  RewriteEngine On
+  RewriteCond %{REQUEST_URI} ^/user/account(/.*)?$
+  RewriteRule ^/user/account(/.*)?$ http://localhost:3000/user/account$1 [P,L]
+
+  RewriteCond %{HTTP:Connection} Upgrade [NC]
+  RewriteCond %{HTTP:Upgrade} websocket [NC]
+
+  RewriteRule ^/(hub|user)(/.*)? ws://localhost:8001/$1$2 [P,L]
+  RewriteRule ^/(hub|user)(/.*)? http://localhost:8001/$1$2 [P,L]
+
+  ProxyPass /hub/ http://localhost:8001/hub/
+  ProxyPassReverse /hub/ http://localhost:8001/hub/
+
+  ProxyPass /user/ http://localhost:8001/user/
+  ProxyPassReverse /user/ http://localhost:8001/user/
+ 
+  <Location />
+    ProxyPass http://localhost:3000/
+    ProxyPassReverse http://localhost:3000/
+  </Location>
+
+
+  Header always set Strict-Transport-Security "max-age=63072000"
+</VirtualHost>
+
+```
+
+Enable and check it:
+
+```bash
+sudo a2enmod proxy proxy_http proxy_wstunnel rewrite
+sudo a2ensite /etc/apache2/sites-available/openhexa.conf
+```
+
+You need to update on OpenHexa config in `/etc/openhexa/env.conf`:
+
+```bash
+TRUST_FORWARDED_PROTO="false"
+PROXY_HOSTNAME_AND_PORT=example.com
+INTERNAL_BASE_URL=http://app:8000
+FRONTEND_PORT=3000
+JUPYTERHUB_PORT=8001
+```
+
+Finally, restart Apache and OpenHexa:
+
+```bash
+sudo systemctl restart openhexa apache2
+```
+
+You can browse now OpenHexa app at `http://example.com`.
+
+##### With TLS/SSL
+
+Additionnaly, you need a certificate.
+
+in `/etc/apache2/sites-available/openhexa-le-ssl.conf`:
+
+```
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+  ServerName example.com
+
+  ProxyPreserveHost On
+  RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
+  
+  RewriteEngine On
+  RewriteCond %{REQUEST_URI} ^/user/account(/.*)?$
+  RewriteRule ^/user/account(/.*)?$ http://localhost:3000/user/account$1 [P,L]
+
+  RewriteCond %{HTTP:Connection} Upgrade [NC]
+  RewriteCond %{HTTP:Upgrade} websocket [NC]
+
+  RewriteRule ^/(hub|user)(/.*)? ws://localhost:8001/$1$2 [P,L]
+  RewriteRule ^/(hub|user)(/.*)? http://localhost:8001/$1$2 [P,L]
+
+  ProxyPass /hub/ http://localhost:8001/hub/
+  ProxyPassReverse /hub/ http://localhost:8001/hub/
+
+  ProxyPass /user/ http://localhost:8001/user/
+  ProxyPassReverse /user/ http://localhost:8001/user/
+ 
+  <Location />
+    ProxyPass http://localhost:3000/
+    ProxyPassReverse http://localhost:3000/
+  </Location>
+
+
+  Header always set Strict-Transport-Security "max-age=63072000"
+
+SSLCertificateFile /etc/letsencrypt/live/example.com/fullchain.pem
+SSLCertificateKeyFile /etc/letsencrypt/live/example.com/privkey.pem
+Include /etc/letsencrypt/options-ssl-apache.conf
+</VirtualHost>
+</IfModule>
+
+```
+
+and in `/etc/openhexa/env.conf`
+
+```bash
+TRUST_FORWARDED_PROTO="true"
+PROXY_HOSTNAME_AND_PORT=example.com
+INTERNAL_BASE_URL=http://app:8000
+FRONTEND_PORT=3000
+JUPYTERHUB_PORT=8001
+```
+
+Then, restart Apache and OpenHexa:
+
+```bash
+sudo systemctl restart openhexa apache2
+```
+
+You can browse now OpenHexa app at `https://example.com`.
