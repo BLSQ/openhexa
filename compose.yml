@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:1.2.4"
+    image: "blsq/openhexa-app:2.3.4"
     platform: linux/amd64
     networks:
       - openhexa
@@ -48,9 +48,9 @@ services:
       timeout: "3s"
       start_period: "5s"
       retries: 3
-  
+
   frontend:
-    image: "blsq/openhexa-frontend:1.2.4"
+    image: "blsq/openhexa-frontend:2.3.4"
     platform: linux/amd64
     networks:
       - openhexa
@@ -108,7 +108,7 @@ services:
       retries: 3
 
   jupyter:
-    image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.9.0}
+    image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.15.0}
     platform: linux/amd64
     command: echo
     profiles:
