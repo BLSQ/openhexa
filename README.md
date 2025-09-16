@@ -40,11 +40,7 @@ To get started, you might be interested in the following pages:
 Roadmap, issues and discussions
 -------------------------------
 
-You can find the public roadmap [here](https://github.com/orgs/BLSQ/projects/3).
-
-Please report bugs in the issues section of this repository: https://github.com/BLSQ/openhexa/main/issues.
-
-Feel free to reach out in the [discussions section](https://github.com/BLSQ/openhexa/discussions) if you have 
+Feel free to reach out in the [discussions section](https://github.com/BLSQ/openhexa/discussions) if you have
 questions or suggestions!
 
 Quick Start

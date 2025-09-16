@@ -1,3 +1,10 @@
+openhexa (2.0-1) stable; urgency=medium
+
+  [ Bram Jans ]
+  * Update versions of OpenHEXA app, frontend, docker-images
+
+ -- Bram Jans <bjans@bluesquarehub.com>  Tue, 16 Sep 2025 15:10:00 -0400
+
 openhexa (1.0-6.1) stable; urgency=medium
 
   [ Quentin Gerome ]
