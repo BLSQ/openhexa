@@ -1,3 +1,11 @@
+openhexa (2.0-1.1) stable; urgency=medium
+
+  [ Bram Jans ]
+  * Update versions of OpenHEXA app, frontend, docker-images
+  * Update readme for DB host overriding
+
+ -- Bram Jans <bjans@bluesquarehub.com>  Tue, 30 Sep 2025 16:36:24 +0200
+
 openhexa (2.0-1) stable; urgency=medium
 
   [ Bram Jans ]
