@@ -318,6 +318,14 @@ In order to be able to send mails to users, you have to provide the configuratio
 - `EMAIL_HOST_PASSWORD`
 - `DEFAULT_FROM_EMAIL`
 
+##### Database connection credentials
+
+The `workspace.db` proxy host doesn't work on local installations of OpenHEXA.
+You can override it by setting this ENV variable to the local IP of the server:
+
+```
+OVERRIDE_WORKSPACES_DATABASE_HOST="<LOCAL-IP>"
+```
 
 #### Test
 
