@@ -78,6 +78,9 @@ Then you can prepare the database and environment with
 ./script/openhexa.sh prepare
 ```
 
+> [!IMPORTANT]
+> The `prepare` command will create an initial superuser for your installation. If you are setting up a real server, make sure you **choose a secure password**.
+
 Finally, you can run openhexa with
 
 ```bash
