@@ -23,7 +23,7 @@ jobs:
         run: apt install -y --no-install-recommends git ca-certificates
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Make the working directory safe for Git if run in GitHub runner container
         run: git config --system --add safe.directory "$PWD"
@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Update APT database
         run: sudo apt update
