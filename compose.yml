@@ -29,9 +29,9 @@ x-app: &common
       PIPELINE_API_URL: http://app:8000
       # The hostname to access the database. It corresponds to an added extra
       # host that is the Docker gateway (see above).
-      DATABASE_HOST: db
-      WORKSPACES_DATABASE_HOST: db
-      WORKSPACES_DATABASE_PROXY_HOST: db
+      DATABASE_HOST: ${DATABASE_HOST:-db}
+      WORKSPACES_DATABASE_HOST: ${WORKSPACES_DATABASE_HOST:-db}
+      WORKSPACES_DATABASE_PROXY_HOST: ${WORKSPACES_DATABASE_PROXY_HOST:-db}
       # To control what hostname can access the backend
       ADDITIONAL_ALLOWED_HOSTS: "app,frontend"
 services:
@@ -135,7 +135,7 @@ services:
       # network
       HUB_IP: jupyterhub
       # The URI of the database dedicated to the Jupyter Hub
-      HUB_DB_URL: postgresql://${JUPYTERHUB_DATABASE_USER:-hexa-hub}:${JUPYTERHUB_DATABASE_PASSWORD:-hexa-hub}@host.docker.internal:${DATABASE_PORT:-5432}/${JUPYTERHUB_DATABASE_NAME:-hexa-hub}
+      HUB_DB_URL: postgresql://${JUPYTERHUB_DATABASE_USER:-hexa-hub}:${JUPYTERHUB_DATABASE_PASSWORD:-hexa-hub}@${JUPYTERHUB_DATABASE_HOST:-host.docker.internal}:${DATABASE_PORT:-5432}/${JUPYTERHUB_DATABASE_NAME:-hexa-hub}
       # The URI to authenticate by the backend through the local Docker network
       AUTHENTICATION_URL: http://app:8000/notebooks/authenticate/
       # The URI to get the default credentials by the backend through the local
