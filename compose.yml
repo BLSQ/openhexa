@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:2.4.0"
+    image: "blsq/openhexa-app:2.18.0"
     platform: linux/amd64
     networks:
       - openhexa
