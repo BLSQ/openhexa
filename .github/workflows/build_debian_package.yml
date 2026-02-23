@@ -106,7 +106,7 @@ jobs:
       - name: Install OpenHexa
         run: |
           sudo dpkg -i openhexa_*_amd64.deb
-      
+
       - name: Check OpenHexa status
         run: |
           sudo systemctl status openhexa.service
@@ -126,6 +126,7 @@ jobs:
       - name: Start OpenHexa if run locally
         if: ${{ env.ACT }}
         run: /usr/share/openhexa/openhexa.sh -g start
+
       - name: Get OpenHexa status
         run: /usr/share/openhexa/openhexa.sh -g status
 
@@ -137,8 +138,10 @@ jobs:
       - name: Build smoke tests image
         working-directory: ./smoke-tests
         run: docker build -t openhexa/smoke-tests .
+
       - name: Run smoke tests
         run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
+
       - name: Keep test results
         uses: actions/upload-artifact@v4
         with:
@@ -204,4 +207,4 @@ jobs:
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo 'curl -sfLo /etc/apt.trusted.gpg.d/${{ needs.build.outputs.keyring }}.asc ${{ steps.deploy-pages.outputs.page_url }}gpg.key' >> $GITHUB_STEP_SUMMARY
           echo 'echo "deb ${{ steps.deploy-pages.outputs.page_url }} ${{ env.CODENAME }} ${{ env.COMPONENTS }}" >/etc/apt/sources.list.d/${{ env.REPO_NAME }}.list' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY                
+          echo '```' >> $GITHUB_STEP_SUMMARY

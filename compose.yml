@@ -32,6 +32,8 @@ x-app: &common
       DATABASE_HOST: db
       WORKSPACES_DATABASE_HOST: db
       WORKSPACES_DATABASE_PROXY_HOST: db
+      # Storage backend for workspace files
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-fs}
       # To control what hostname can access the backend
       ADDITIONAL_ALLOWED_HOSTS: "app,frontend"
 services:
