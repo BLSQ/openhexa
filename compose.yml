@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:2.4.0"
+    image: "blsq/openhexa-app:4.2.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -21,7 +21,7 @@ x-app: &common
       # It allows us to run the fixture command
       DEBUG: true
       # The Python module where Django can find its settings
-      DJANGO_SETTINGS_MODULE: config.settings.local
+      DJANGO_SETTINGS_MODULE: config.settings.base
       # The URI to access the Jupyter Hub through the local Docker network
       NOTEBOOKS_HUB_URL: http://jupyterhub:8000/hub
       # The URL passed to the pipelines to access the backend API through the
@@ -32,6 +32,8 @@ x-app: &common
       DATABASE_HOST: db
       WORKSPACES_DATABASE_HOST: db
       WORKSPACES_DATABASE_PROXY_HOST: db
+      # Storage backend for workspace files
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-fs}
       # To control what hostname can access the backend
       ADDITIONAL_ALLOWED_HOSTS: "app,frontend"
 services:
@@ -50,7 +52,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:2.4.0"
+    image: "blsq/openhexa-frontend:4.2.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -108,7 +110,7 @@ services:
       retries: 3
 
   jupyter:
-    image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.16.0}
+    image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.17.0}
     platform: linux/amd64
     command: echo
     profiles:
