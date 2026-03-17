@@ -12,7 +12,7 @@ source "${SCRIPT_DIR}/common_functions.sh"
 function usage() {
   if [[ -z $1 ]]; then
     echo """
-    
+
     Usage:    $0 [OPTIONS] COMMAND
 
     OPTIONS:
@@ -44,7 +44,7 @@ function usage() {
   case $cmd in
   restore)
     echo """
-      
+
     Usage:    restore [OPTIONS]
 
     OPTIONS: none
@@ -287,7 +287,7 @@ function execute() {
     exit_properly 0
     ;;
   prepare)
-    run_compose_with_profiles run app fixtures
+    run_compose_with_profiles run app fixtures --localhosting
     run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0
     ;;
