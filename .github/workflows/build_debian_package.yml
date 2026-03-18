@@ -44,7 +44,7 @@ jobs:
           cp ../openhexa_*_amd64.deb .
 
       - name: Keep package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: debian_package_amd64
           path: openhexa_*_amd64.deb
@@ -80,7 +80,7 @@ jobs:
       #     sudo sh /tmp/get-docker.sh
 
       - name: Retrieve package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debian_package_amd64
 
@@ -140,7 +140,7 @@ jobs:
       - name: Run smoke tests
         run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
       - name: Keep test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Smoke tests results
           path: smoke-test-results/
@@ -162,7 +162,7 @@ jobs:
     steps:
       - name: Retrieve package
         if: ${{ ! env.ACT }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debian_package_amd64
       - uses: morph027/apt-repo-action@main
