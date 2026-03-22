@@ -32,7 +32,6 @@ function usage() {
 
     COMMANDS:
 
-    all       sets up all: first the PostgreSQL database, then the environment
     env       sets up the environment and stores it in a file (requires an
               existing PostgreSQL cluster named \`openhexa\`)
     db        sets up the PostgreSQL database
@@ -380,9 +379,8 @@ function setup_env() {
   echo "Setup environment:"
 
   if ! does_postgresql_cluster_openhexa_exist >/dev/null 2>&1; then
-    echo "The PostgreSQL cluster for OpenHexa hasn't been created."
-    echo "Please first run \`$0 db\` or \`$0 all\`."
-    return 1
+    prompt_sudo_password_if_needed
+    ensure_db_cluster || return 1
   fi
 
   db_port=$(get_postgresql_port_for_cluster_openhexa)
@@ -420,15 +418,12 @@ function create_pgsql_cluster() {
   $SUDO_COMMAND pg_createcluster "${PGSQL_VERSION}" "${PGSQL_CLUSTER}" --start >/dev/null 2>&1
 }
 
-function setup_db() {
-  local db_port
-  echo "Setup database:"
-
+function ensure_db_cluster() {
   echo -n "- create cluster if it does not exists ... "
   if ! does_postgresql_cluster_openhexa_exist; then
     create_pgsql_cluster
     echo "created"
-    
+
     echo -n "- make the cluster listening on the Docker network ... "
     listen_on_docker_network
     echo "done"
@@ -440,14 +435,6 @@ function setup_db() {
     echo -n "- restart the cluster to take in account new setup ... "
     restart_postgreql
     echo "done"
-
-    echo -n "- create users and databases for the Open Hexa app and Jupyter Hub ... "
-    db_port=$(get_postgresql_port_for_cluster_openhexa)
-    create_postgresql_user "${db_port}" "$(get_config_or_default DATABASE_USER)" "$(get_config_or_default DATABASE_PASSWORD)"
-    create_postgresql_db "${db_port}" "$(get_config_or_default DATABASE_NAME)" "$(get_config_or_default DATABASE_USER)"
-    create_postgresql_user "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)" "$(get_config_or_default JUPYTERHUB_DATABASE_PASSWORD)"
-    create_postgresql_db "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_NAME)" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)"
-    echo "done"
   else
     echo "already created"
   fi
@@ -457,6 +444,21 @@ function setup_db() {
     restart_postgreql
   fi
   echo "running"
+}
+
+function setup_db() {
+  local db_port
+  echo "Setup database:"
+
+  ensure_db_cluster || return 1
+
+  echo -n "- create users and databases for the Open Hexa app and Jupyter Hub ... "
+  db_port=$(get_postgresql_port_for_cluster_openhexa)
+  create_postgresql_user "${db_port}" "$(get_config_or_default DATABASE_USER)" "$(get_config_or_default DATABASE_PASSWORD)"
+  create_postgresql_db "${db_port}" "$(get_config_or_default DATABASE_NAME)" "$(get_config_or_default DATABASE_USER)"
+  create_postgresql_user "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)" "$(get_config_or_default JUPYTERHUB_DATABASE_PASSWORD)"
+  create_postgresql_db "${db_port}" "$(get_config_or_default JUPYTERHUB_DATABASE_NAME)" "$(get_config_or_default JUPYTERHUB_DATABASE_USER)"
+  echo "done"
 }
 
 function remove_user_and_group() {
@@ -681,12 +683,6 @@ function execute() {
   local command=$1
   local exit_code=0
   case "${command}" in
-  all)
-    prompt_sudo_password_if_needed
-    setup_db || exit_properly 1
-    setup_env || exit_properly 1
-    exit_properly 0
-    ;;
   env)
     setup_env
     exit_properly 0

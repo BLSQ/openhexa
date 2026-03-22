@@ -62,15 +62,22 @@ your installation by running first
 It'll tell you that the `.env` is missing, that is expected as it's the next
 step.
 
-Then, you need to setup the environment and the database. To do so execute the
-following command
+Then, generate the configuration file:
 
 ```bash
-./script/setup.sh all
+./script/setup.sh env
 ```
 
-This will generate a file in the working directory: `.env` (ee below to
-know more about the configuration properties).
+This will generate a file in the working directory: `.env` (see below to
+know more about the configuration properties). Review it and adjust settings
+such as database passwords before continuing.
+
+Then, set up the PostgreSQL database (cluster, users, and databases using
+values from your `.env`):
+
+```bash
+./script/setup.sh db
+```
 
 Then you can prepare the database and environment with
 
