@@ -401,6 +401,7 @@ function setup_env() {
     HUB_API_TOKEN=$(openssl rand -hex 32) \
     SECRET_KEY=$(generate_django_secret_key) \
     ENCRYPTION_KEY=$(generate_fernet_encryption_key) \
+    GIT_SERVER_ADMIN_PASSWORD=$(openssl rand -hex 16) \
     WORKSPACE_STORAGE_LOCATION="${current_working_directory}${WORKSPACE_DATA_DIRECTORY}" \
     DB_PORT=$db_port \
       envsubst <"$(dist_dot_env_file)" >"$(dot_env_file)"
