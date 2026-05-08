@@ -39,11 +39,13 @@ x-app: &common
 services:
   app:
     <<: *common
-    command: "manage runserver 0:8000"
+    command: "start"
     restart: unless-stopped
     container_name: app
     ports:
       - "${APP_PORT:-8000}:8000"
+    depends_on:
+      - forgejo
     healthcheck:
       test: curl "http://app:8000/ready" || exit 1
       interval: "60s"
