@@ -104,6 +104,15 @@ function is_backend_reachable() {
   (($(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready) == 200))
 }
 
+function is_forgejo_reachable() {
+  local port
+  port=$(
+    load_env 2>/dev/null
+    echo "${FORGEJO_PORT:-3100}"
+  )
+  (($(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}/api/v1/version") == 200))
+}
+
 function is_db_accepting_connexion() {
   # TODO replace with get_config_or_default
   (
@@ -252,6 +261,13 @@ function execute() {
     fi
     echo -n "Backend HTTP Reachable: "
     if is_backend_reachable; then
+      echo "Yes"
+    else
+      echo "No"
+      exit_code=1
+    fi
+    echo -n "Forgejo HTTP Reachable: "
+    if is_forgejo_reachable; then
       echo "Yes"
     else
       echo "No"
