@@ -48,9 +48,7 @@ Requirements:
 - Debian bookworm
 - Debian packages `gettext-base`, `postgresql` (16+), `postgresql-<postgresql version>-postgis-3`, `duplicity` (optional to manage backup and restore)
 - [yq](https://github.com/mikefarah/yq/#install)
-- Outbound network access on port `3000` to pull the Forgejo image from
-  `codeberg.org/forgejo/forgejo` and host port `3100` available for the
-  bundled Git server (override with `FORGEJO_PORT`).
+- Host port `3100` available for the bundled Forgejo Git server (override with `FORGEJO_PORT`)
 
 After having cloned this repo and change your current dir to it, you can check
 your installation by running first

@@ -198,12 +198,12 @@ services:
       FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
     volumes:
       - forgejo_data:/data
-      - /usr/share/openhexa/forgejo/entrypoint.sh:/custom-entrypoint.sh:ro
+      - ${FORGEJO_ENTRYPOINT_PATH:-./forgejo/entrypoint.sh}:/custom-entrypoint.sh:ro
     ports:
       - "${FORGEJO_PORT:-3100}:3000"
     restart: unless-stopped
     healthcheck:
-      test: curl -fs "http://localhost:3000/api/v1/version" || exit 1
+      test: curl -fs "http://localhost:3000/api/healthz" || exit 1
       interval: "60s"
       timeout: "3s"
       start_period: "10s"
