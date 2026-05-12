@@ -304,6 +304,7 @@ function execute() {
     ;;
   prepare)
     run_compose_with_profiles run app fixtures --localhosting
+    run_compose_with_profiles run app python manage.py sync_git_orgs
     run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0
     ;;
