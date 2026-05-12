@@ -266,9 +266,20 @@ function perform_restore() {
   require_backup_config || return 1
   (
     load_env
-    local location passphrase dumpfile_path envcopy_path pgpassfile psql_exit_code psql_result
+    local location passphrase dumpfile_path envcopy_path pgpassfile psql_exit_code psql_result running_services
     location=$(get_backup_config LOCATION)
     passphrase=$(get_backup_config PASSPHRASE)
+
+    echo -n "Check that no OpenHEXA services are running ... "
+    running_services=$(number_of_running_services)
+    if ((running_services > 0)); then
+      echo "KO"
+      echo "Refusing to restore while ${running_services} service(s) are running."
+      echo "Active connections would block DROP DATABASE during the dump replay."
+      echo "Stop everything first with: ./script/openhexa.sh stop"
+      return 1
+    fi
+    echo "OK"
 
     echo -n "Keep a copy of the workspace target ... "
     mv "${WORKSPACE_STORAGE_LOCATION}" "${WORKSPACE_STORAGE_LOCATION}-$(date -Iseconds)"

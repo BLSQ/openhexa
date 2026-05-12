@@ -301,7 +301,7 @@ Once configured, the following commands are available:
 | --- | --- |
 | `/usr/share/openhexa/openhexa.sh backup` | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot. |
 | `/usr/share/openhexa/openhexa.sh backup-status` | Show the duplicity `collection-status` for both the `workspaces` and `forgejo` backends. |
-| `/usr/share/openhexa/openhexa.sh restore` | Restore the latest backup. We advise stopping the service before a full restore. |
+| `/usr/share/openhexa/openhexa.sh restore` | Restore the latest backup. This requires stopping the services before a full restore. |
 
 After a restore, an `openhexa-env.bak` file is left next to the workspace data:
 compare it with the live `.env` to make sure `ENCRYPTION_KEY`, `SECRET_KEY` and
