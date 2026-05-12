@@ -77,7 +77,7 @@ Then you can prepare the database and environment with
 ```
 
 > [!IMPORTANT]
-> The `prepare` command will create an initial superuser for your installation. If you are setting up a real server, make sure you **choose a secure password**.
+> The `prepare` command will create an initial superuser using the credentials in `.env` (`DJANGO_SUPERUSER_USERNAME` / `DJANGO_SUPERUSER_PASSWORD`). On a fresh install, `setup.sh` auto-generates a random `DJANGO_SUPERUSER_PASSWORD`. Check `.env` to retrieve it for the first login, or edit it before running `prepare` if you want to set your own.
 
 Finally, you can run openhexa with
 
