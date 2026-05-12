@@ -33,8 +33,9 @@ function usage() {
     update      pulls last container images
     prepare     runs databases migrations and installs fixtures
     logs        gets all the logs
-    backup      backs up OpenHexa
-    restore     restores OpenHexa, more details with \`help restore\`
+    backup         backs up OpenHexa
+    backup-status  show duplicity collection-status for the workspaces and forgejo backends
+    restore        restores OpenHexa, more details with \`help restore\`
     help [cmd]  prints current usage documentation or of the given command \`cmd\`
     version     prints current version
     """
@@ -156,7 +157,24 @@ function duplicity_parameters_for_some_type() {
   *) ;;
   esac
 }
+function require_backup_config() {
+  local location passphrase
+  if [[ ! -r "$(backup_conf_file)" ]]; then
+    echo "Backup not configured: $(backup_conf_file) is missing."
+    echo "Run \`setup.sh backup <LOCATION> <PASSPHRASE>\` first."
+    return 1
+  fi
+  location=$(get_backup_config LOCATION)
+  passphrase=$(get_backup_config PASSPHRASE)
+  if [[ -z $location || -z $passphrase ]]; then
+    echo "Backup config $(backup_conf_file) is missing LOCATION or PASSPHRASE."
+    return 1
+  fi
+  return 0
+}
+
 function perform_backup() {
+  require_backup_config || return 1
   (
     load_env
     local dumpfile_path envcopy_path type location passphrase oldest_full_age pgpassfile
@@ -217,7 +235,21 @@ function perform_backup() {
     echo "OK"
   )
 }
+function perform_backup_status() {
+  require_backup_config || return 1
+  local location passphrase rc=0
+  location=$(get_backup_config LOCATION)
+  passphrase=$(get_backup_config PASSPHRASE)
+  for backend in workspaces forgejo; do
+    echo "=== ${backend} (${location}/${backend}) ==="
+    PASSPHRASE=$passphrase duplicity collection-status "${location}/${backend}" || rc=$?
+    echo
+  done
+  return $rc
+}
+
 function perform_restore() {
+  require_backup_config || return 1
   (
     load_env
     local location passphrase dumpfile_path envcopy_path pgpassfile psql_exit_code psql_result
@@ -358,6 +390,10 @@ function execute() {
     ;;
   backup)
     perform_backup
+    exit_properly $?
+    ;;
+  backup-status)
+    perform_backup_status
     exit_properly $?
     ;;
   restore)
