@@ -111,7 +111,7 @@ function is_forgejo_reachable() {
     load_env 2>/dev/null
     echo "${FORGEJO_PORT:-3100}"
   )
-  (($(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}/api/v1/version") == 200))
+  (($(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}/api/healthz") == 200))
 }
 
 function is_db_accepting_connexion() {
