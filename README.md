@@ -292,25 +292,20 @@ First, you need to set it up:
 The target directory will contain two duplicity backends side by side:
 `<LOCATION>/workspaces` and `<LOCATION>/forgejo`.
 
-Then you can back up the data with:
-
-```bash
-/usr/share/openhexa/openhexa.sh backup
-```
-
 Depending on the user activities, it might be a good idea to stop the service or
 simply redirect the website to a maintenance HTML page.
 
-To restore the data, you execute the following:
+Once configured, the following commands are available:
 
-```bash
-/usr/share/openhexa/openhexa.sh restore
-```
+| Command | Description |
+| --- | --- |
+| `/usr/share/openhexa/openhexa.sh backup` | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot. |
+| `/usr/share/openhexa/openhexa.sh backup-status` | Show the duplicity `collection-status` for both the `workspaces` and `forgejo` backends. |
+| `/usr/share/openhexa/openhexa.sh restore` | Restore the latest backup. We advise stopping the service before a full restore. |
 
-In this case, we advise you to stop the service before performing a full
-restore. After restore, an `openhexa-env.bak` file is left next to the workspace
-data: compare it with the live `.env` to make sure `ENCRYPTION_KEY`,
-`SECRET_KEY` and the JupyterHub/Forgejo secrets match the restored database.
+After a restore, an `openhexa-env.bak` file is left next to the workspace data:
+compare it with the live `.env` to make sure `ENCRYPTION_KEY`, `SECRET_KEY` and
+the JupyterHub/Forgejo secrets match the restored database.
 
 ###### Restoring a pre-Forgejo backup (legacy layout)
 
