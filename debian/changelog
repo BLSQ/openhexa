@@ -19,6 +19,12 @@ openhexa (4.0-1) stable; urgency=medium
     optional `OPENHEXA_JWT_*` for issuing workspace tokens.
   * Refresh the S3 storage backend section in `.env.dist` to match
     upstream (S3 backend support, new in OpenHEXA 5.3.0).
+  * Backup/restore now also captures `FORGEJO_STORAGE_LOCATION` and a
+    snapshot of `.env`. The on-disk layout under the backup `LOCATION`
+    changes: data is split into `<LOCATION>/workspaces` and
+    `<LOCATION>/forgejo`. Existing pre-upgrade backups remain readable
+    by pointing `duplicity restore` at the old path, but new backups
+    will start a fresh full at the new sub-prefix.
 
  -- Bram Jans <bjans@bluesquarehub.com>  Fri, 08 May 2026 16:03:52 +0200
 

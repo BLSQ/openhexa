@@ -158,18 +158,14 @@ function duplicity_parameters_for_some_type() {
 }
 function perform_backup() {
   (
-    echo -n "Prepare dump of the whole PostgreSQL cluster dedicated to OpenHexa ... "
-    local dumpfile_path
     load_env
-    dumpfile_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-dumpall.sql"
-    pgpassfile=$(begin_pgsql_session localhost "${DATABASE_PORT}" "${DATABASE_USER}" "${DATABASE_PASSWORD}")
-    PGPASSFILE=$pgpassfile pg_dumpall --file "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}"
-    end_pgsql_session "${pgpassfile}"
-    echo "OK"
+    local dumpfile_path envcopy_path type location passphrase oldest_full_age pgpassfile
 
     echo -n "Load backup configuration ... "
-    local type
     type=$(get_backup_config TYPE)
+    location=$(get_backup_config LOCATION)
+    passphrase=$(get_backup_config PASSPHRASE)
+    oldest_full_age=$(get_backup_config OLDEST_FULL_BCK_AGE)
     # case $type in
     # s3)
     #   export AWS_ACCESS_KEY_ID=$(get_backup_config ACCESS_KEY_ID)
@@ -183,35 +179,76 @@ function perform_backup() {
     # esac
     echo "OK"
 
-    echo -n "Back up workspace files and PostgreSQL dump ... "
-    PASSPHRASE=$(get_backup_config PASSPHRASE) \
+    echo -n "Prepare dump of the whole PostgreSQL cluster dedicated to OpenHexa ... "
+    dumpfile_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-dumpall.sql"
+    pgpassfile=$(begin_pgsql_session localhost "${DATABASE_PORT}" "${DATABASE_USER}" "${DATABASE_PASSWORD}")
+    PGPASSFILE=$pgpassfile pg_dumpall --file "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}"
+    end_pgsql_session "${pgpassfile}"
+    echo "OK"
+
+    # Snapshot .env alongside the data. ENCRYPTION_KEY, SECRET_KEY,
+    # JUPYTERHUB_CRYPT_KEY, HUB_API_TOKEN and the admin passwords live
+    # only here; without them a DB restore is unrecoverable.
+    echo -n "Stage configuration snapshot (.env) ... "
+    envcopy_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-env.bak"
+    cp -a "$(dot_env_file)" "${envcopy_path}"
+    echo "OK"
+
+    echo -n "Back up workspace files, PostgreSQL dump, and .env snapshot ... "
+    PASSPHRASE=$passphrase \
       duplicity incremental \
       $(duplicity_parameters_for_some_type "${type}") \
-      --full-if-older-than "$(get_backup_config OLDEST_FULL_BCK_AGE)" \
+      --full-if-older-than "${oldest_full_age}" \
       "${WORKSPACE_STORAGE_LOCATION}" \
-      "$(get_backup_config LOCATION)"
+      "${location}/workspaces"
     echo "OK"
-    echo -n "Remove DB cluster dump ... "
-    rm "${dumpfile_path}"
+
+    echo -n "Back up Forgejo data (repos + SQLite metadata) ... "
+    PASSPHRASE=$passphrase \
+      duplicity incremental \
+      $(duplicity_parameters_for_some_type "${type}") \
+      --full-if-older-than "${oldest_full_age}" \
+      "${FORGEJO_STORAGE_LOCATION}" \
+      "${location}/forgejo"
+    echo "OK"
+
+    echo -n "Remove staged DB dump and env snapshot ... "
+    rm "${dumpfile_path}" "${envcopy_path}"
     echo "OK"
   )
 }
 function perform_restore() {
   (
     load_env
-    echo -n "Keep a copy of the target ..."
+    local location passphrase dumpfile_path envcopy_path pgpassfile psql_exit_code psql_result
+    location=$(get_backup_config LOCATION)
+    passphrase=$(get_backup_config PASSPHRASE)
+
+    echo -n "Keep a copy of the workspace target ... "
     mv "${WORKSPACE_STORAGE_LOCATION}" "${WORKSPACE_STORAGE_LOCATION}-$(date -Iseconds)"
     mkdir "${WORKSPACE_STORAGE_LOCATION}"
     echo "OK"
+
     echo -n "Restore workspace files ... "
-    PASSPHRASE=$(get_backup_config PASSPHRASE) \
+    PASSPHRASE=$passphrase \
       duplicity restore \
-      "$(get_backup_config LOCATION)" \
+      "${location}/workspaces" \
       "${WORKSPACE_STORAGE_LOCATION}"
     echo "OK"
 
-    echo -n "Restore PostgreSQL dump ..."
-    local dumpfile_path pgpassfile psql_exit_code psql_result
+    echo -n "Keep a copy of the Forgejo target ... "
+    mv "${FORGEJO_STORAGE_LOCATION}" "${FORGEJO_STORAGE_LOCATION}-$(date -Iseconds)"
+    mkdir "${FORGEJO_STORAGE_LOCATION}"
+    echo "OK"
+
+    echo -n "Restore Forgejo data ... "
+    PASSPHRASE=$passphrase \
+      duplicity restore \
+      "${location}/forgejo" \
+      "${FORGEJO_STORAGE_LOCATION}"
+    echo "OK"
+
+    echo -n "Restore PostgreSQL dump ... "
     dumpfile_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-dumpall.sql"
     if [[ ! -r $dumpfile_path ]]; then
       echo "KO: the dump file ${dumpfile_path} is not readable."
@@ -226,8 +263,15 @@ function perform_restore() {
       rm "${dumpfile_path}"
     else
       echo "KO: ${psql_result}"
+      return $psql_exit_code
     fi
-    return $psql_exit_code
+
+    envcopy_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-env.bak"
+    if [[ -r $envcopy_path ]]; then
+      echo "Configuration snapshot restored to ${envcopy_path}."
+      echo "Compare it with $(dot_env_file) before discarding; the encryption keys must match the restored database."
+    fi
+    return 0
   )
 }
 

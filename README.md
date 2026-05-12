@@ -269,16 +269,28 @@ During the setup, the following is done on the PostgreSQL side:
 
 ##### Backup
 
-You can manage your backup and restore directly with OpenHexa. It will backup
-all the workspaces data, and all databases. This relies on the tool `duplicity`.
-Make sure that it is installed if you haven't installed it yet (if you install
-OpenHexa with `apt`, do it with the recommended packages).
+You can manage your backup and restore directly with OpenHexa. It backs up:
+
+- a `pg_dumpall` of the PostgreSQL cluster (covers the `hexa-app` and
+- the workspace files at `WORKSPACE_STORAGE_LOCATION`,
+  `hexa-hub` databases),
+- the Forgejo data directory at `FORGEJO_STORAGE_LOCATION` (git repositories
+  for static webapps plus Forgejo's SQLite metadata database),
+- a snapshot of `.env` (so the encryption keys needed to read the restored
+  database are kept alongside the data).
+
+This relies on the tool `duplicity`. Make sure that it is installed if you
+haven't installed it yet (if you install OpenHexa with `apt`, do it with the
+recommended packages).
 
 First, you need to set it up:
 
 ```bash
-/usr/share/openhexa/setup.sh backup /mylocaldirecotry/where/to/do/thebackup/ encryption_passkey
+/usr/share/openhexa/setup.sh backup /mylocaldirectory/where/to/do/thebackup/ encryption_passkey
 ```
+
+The target directory will contain two duplicity backends side by side:
+`<LOCATION>/workspaces` and `<LOCATION>/forgejo`.
 
 Then you can back up the data with:
 
@@ -292,11 +304,13 @@ simply redirect the website to a maintenance HTML page.
 To restore the data, you execute the following:
 
 ```bash
-/usr/share/openhexa/openhexa.sh backup
+/usr/share/openhexa/openhexa.sh restore
 ```
 
 In this case, we advise you to stop the service before performing a full
-restore.
+restore. After restore, an `openhexa-env.bak` file is left next to the workspace
+data: compare it with the live `.env` to make sure `ENCRYPTION_KEY`,
+`SECRET_KEY` and the JupyterHub/Forgejo secrets match the restored database.
 
 #### Configuration properties
 
