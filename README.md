@@ -312,6 +312,32 @@ restore. After restore, an `openhexa-env.bak` file is left next to the workspace
 data: compare it with the live `.env` to make sure `ENCRYPTION_KEY`,
 `SECRET_KEY` and the JupyterHub/Forgejo secrets match the restored database.
 
+###### Restoring a pre-Forgejo backup (legacy layout)
+
+Backups taken before the Forgejo upgrade used a single duplicity backend at
+`<LOCATION>` (no `workspaces` / `forgejo` sub-prefix) and did not include a
+Forgejo data directory or an `.env` snapshot. `openhexa.sh restore` won't
+recover them as-is — it expects both new sub-prefixes to exist. Restore them
+by hand with `duplicity`:
+
+```bash
+# Stop the services first
+sudo systemctl stop openhexa
+
+# Restore the workspace tree (includes the legacy openhexa-dumpall.sql)
+sudo -u openhexa PASSPHRASE='your-passphrase' duplicity restore \
+    file:///path/to/old/backup/ \
+    /var/lib/openhexa/workspaces
+
+# Load the PostgreSQL dump
+sudo -u postgres psql -f /var/lib/openhexa/workspaces/openhexa-dumpall.sql template1
+
+# Forgejo had no data in the legacy layout: leave FORGEJO_STORAGE_LOCATION
+# empty and let `openhexa.sh prepare` bootstrap a fresh Forgejo on next start.
+sudo systemctl start openhexa
+/usr/share/openhexa/openhexa.sh prepare
+```
+
 #### Configuration properties
 
 ##### The storage engine
