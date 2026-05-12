@@ -286,7 +286,7 @@ recommended packages).
 First, you need to set it up:
 
 ```bash
-/usr/share/openhexa/setup.sh backup /mylocaldirectory/where/to/do/thebackup/ encryption_passkey
+/usr/share/openhexa/setup.sh backup file:///mylocaldirectory/where/to/do/thebackup/ encryption_passkey
 ```
 
 The target directory will contain two duplicity backends side by side:

@@ -569,8 +569,11 @@ function detect_file_server_type() {
     echo "${scheme}"
     ;;
   *)
-    echo "The scheme \`${scheme}\` is not supported. Supported file server types are:"
-    echo "local file systeme (file://), and SFTP (sftp://)."
+    # stderr, not stdout: the caller invokes us inside `$(...)`, so anything
+    # on stdout becomes the captured "type" instead of reaching the user.
+    echo "The scheme \`${scheme}\` is not supported. Supported file server types are:" >&2
+    echo "local file systeme (file://), and SFTP (sftp://)." >&2
+    echo "Did you mean \`file://${location}\`?" >&2
     # AWS S3 (s3://), Google Cloud Storage (gs://),
     exit 1
     ;;
@@ -643,7 +646,9 @@ function generate_or_update_backup_config() {
   done
   shift $((OPTIND - 1))
   local type
-  type=$(detect_file_server_type "${location}")
+  if ! type=$(detect_file_server_type "${location}"); then
+    exit_properly 1
+  fi
   echo "- file server location: ${location}"
   echo "- file server type detected: ${type}"
   # case $type in
