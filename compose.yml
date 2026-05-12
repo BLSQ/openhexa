@@ -35,7 +35,7 @@ x-app: &common
       # Storage backend for workspace files
       STORAGE_BACKEND: ${STORAGE_BACKEND:-fs}
       # To control what hostname can access the backend
-      ADDITIONAL_ALLOWED_HOSTS: "app,frontend"
+      ADDITIONAL_ALLOWED_HOSTS: "app,frontend,${ADDITIONAL_ALLOWED_HOSTS:-}"
       # Forgejo Git server URL (reachable on the local Docker network)
       GIT_SERVER_URL: http://forgejo:3000
       # Optional: parent domain for serving static webapps from a subdomain.

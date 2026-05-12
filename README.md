@@ -95,7 +95,7 @@ If you need to purge the configuration and the database after having stopped it,
 you can do it by executing the following command
 
 ```bash
-./script/openhexa.sh purge
+./script/setup.sh purge
 ```
 
 Once installed, it could be interesting to make sure you have the last version.
