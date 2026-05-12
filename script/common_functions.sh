@@ -2,6 +2,7 @@ COMPOSE_FILE_PATH="compose.yml"
 CONFIG_FILE_PATH=".env"
 BACKUP_CONFIG_FILE_PATH="backup.conf"
 WORKSPACE_DATA_DIRECTORY="workspaces"
+FORGEJO_DATA_DIRECTORY="forgejo_data"
 
 SUDO_COMMAND="sudo"
 
@@ -24,6 +25,7 @@ function setup() {
     CONFIG_FILE_PATH="/etc/openhexa/env.conf"
     BACKUP_CONFIG_FILE_PATH="/etc/openhexa/backup.conf"
     WORKSPACE_DATA_DIRECTORY="/var/lib/openhexa/workspaces"
+    FORGEJO_DATA_DIRECTORY="/var/lib/openhexa/forgejo_data"
     FORGEJO_ENTRYPOINT_PATH="/usr/share/openhexa/forgejo/entrypoint.sh"
   fi
   if ((UID == 0)); then

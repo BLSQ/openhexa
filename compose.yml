@@ -188,6 +188,12 @@ services:
       - openhexa
     entrypoint: /custom-entrypoint.sh
     environment:
+      # Align Forgejo's internal `git` user with the host owner of
+      # FORGEJO_STORAGE_LOCATION, mirroring how the `app` service runs.
+      # Note: we can't set the container user directly since Forgejo
+      # (and custom-entrypoint.sh) must start as root.
+      USER_UID: ${OH_UID:-1000}
+      USER_GID: ${OH_GID:-1000}
       GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
       GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
       FORGEJO__database__DB_TYPE: sqlite3
@@ -197,7 +203,7 @@ services:
       FORGEJO__service__DISABLE_REGISTRATION: "true"
       FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
     volumes:
-      - forgejo_data:/data
+      - "${FORGEJO_STORAGE_LOCATION}:/data"
       - ${FORGEJO_ENTRYPOINT_PATH:-./forgejo/entrypoint.sh}:/custom-entrypoint.sh:ro
     ports:
       - "${FORGEJO_PORT:-3100}:3000"
@@ -212,6 +218,3 @@ services:
 networks:
   openhexa:
     name: openhexa
-
-volumes:
-  forgejo_data:

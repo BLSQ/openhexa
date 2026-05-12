@@ -5,6 +5,7 @@ test-results/
 .secrets
 openhexa.nginx
 workspaces/
+forgejo_data/
 backup.conf*
 backup/
 workspaces-*

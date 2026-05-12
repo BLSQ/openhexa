@@ -19,7 +19,7 @@ PGSQL_CLUSTER="openhexa"
 function usage() {
   if [[ -z $1 ]]; then
     echo """
-    
+
     Usage:    $0 [OPTIONS] COMMAND
 
     OPTIONS:
@@ -28,7 +28,7 @@ function usage() {
               installed on the system. By default, it runs in its current working
               directory
 
-    -d        enables debug output            
+    -d        enables debug output
 
     COMMANDS:
 
@@ -49,7 +49,7 @@ function usage() {
   case $cmd in
   backup)
     echo """
-      
+
     Usage:    backup LOCATION PASSPHRASE [OPTIONS]
 
     LOCATION
@@ -153,7 +153,7 @@ function is_docker_engine_running() {
     try the following:
     - Start the services \`sudo systemctl start docker.service containerd.service\`
     - Check their status \`sudo systemctl status docker.service containerd.service\`
-    
+
     For more details see https://docs.docker.com/engine/install/linux-postinstall/
 
     If you run in a container, you very likely need to share the Docker socket
@@ -191,7 +191,7 @@ function is_postgresql_service_running() {
     If you use init.d, please try the following with a user having the superuser
     rights (that works also in a container):
     - Start the service \`/etc/init.d/postgresql start\`
-    - Check its the status \`/etc/init.d/postgresql status\`    
+    - Check its the status \`/etc/init.d/postgresql status\`
 EOF
     return 1
   fi
@@ -351,11 +351,11 @@ function setup_user() {
 
 function setup_local_storage() {
   if [[ $OPTION_GLOBAL == "on" ]]; then
-    $SUDO_COMMAND mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
-    $SUDO_COMMAND chown $(id -u openhexa):$(id -g openhexa) "${WORKSPACE_DATA_DIRECTORY}"
+    $SUDO_COMMAND mkdir -p "${WORKSPACE_DATA_DIRECTORY}" "${FORGEJO_DATA_DIRECTORY}"
+    $SUDO_COMMAND chown $(id -u openhexa):$(id -g openhexa) "${WORKSPACE_DATA_DIRECTORY}" "${FORGEJO_DATA_DIRECTORY}"
   else
-    mkdir -p "${WORKSPACE_DATA_DIRECTORY}"
-    chmod 770 "${WORKSPACE_DATA_DIRECTORY}"
+    mkdir -p "${WORKSPACE_DATA_DIRECTORY}" "${FORGEJO_DATA_DIRECTORY}"
+    chmod 770 "${WORKSPACE_DATA_DIRECTORY}" "${FORGEJO_DATA_DIRECTORY}"
   fi
 }
 
@@ -404,6 +404,7 @@ function setup_env() {
     GIT_SERVER_ADMIN_PASSWORD=$(openssl rand -hex 16) \
     DJANGO_SUPERUSER_PASSWORD=$(openssl rand -hex 16) \
     WORKSPACE_STORAGE_LOCATION="${current_working_directory}${WORKSPACE_DATA_DIRECTORY}" \
+    FORGEJO_STORAGE_LOCATION="${current_working_directory}${FORGEJO_DATA_DIRECTORY}" \
     DB_PORT=$db_port \
       envsubst <"$(dist_dot_env_file)" >"$(dot_env_file)"
   )
@@ -430,7 +431,7 @@ function setup_db() {
   if ! does_postgresql_cluster_openhexa_exist; then
     create_pgsql_cluster
     echo "created"
-    
+
     echo -n "- make the cluster listening on the Docker network ... "
     listen_on_docker_network
     echo "done"
@@ -480,6 +481,12 @@ function remove_local_storage() {
   if (($exit_code != 0)) && [[ ! -d $WORKSPACE_DATA_DIRECTORY ]]; then
     exit_code=0
   fi
+  local forgejo_exit_code=0
+  $SUDO_COMMAND find "${FORGEJO_DATA_DIRECTORY}" -delete 2>/dev/null || forgejo_exit_code=$?
+  if (($forgejo_exit_code != 0)) && [[ ! -d $FORGEJO_DATA_DIRECTORY ]]; then
+    forgejo_exit_code=0
+  fi
+  (($exit_code == 0)) && exit_code=$forgejo_exit_code
   return $exit_code
 }
 
@@ -519,7 +526,7 @@ function purge_env() {
   else
     echo "failed"
   fi
-  echo -n "- workspace data ... "
+  echo -n "- workspace and forgejo (git server) data ... "
   if remove_local_storage; then
     echo "removed"
   else
