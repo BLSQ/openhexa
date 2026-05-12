@@ -173,11 +173,28 @@ function require_backup_config() {
   return 0
 }
 
+function full_if_older_than_arg() {
+  local age=$1
+  [[ -n $age ]] && echo "--full-if-older-than ${age}"
+}
+
+function run_duplicity_backup() {
+  local source=$1 target=$2 type=$3 passphrase=$4 oldest_full_age=$5
+  # No action verb on purpose: duplicity picks `full` on first run and
+  # `incremental` thereafter, so the same command works on empty targets.
+  PASSPHRASE=$passphrase \
+    duplicity \
+    $(duplicity_parameters_for_some_type "${type}") \
+    $(full_if_older_than_arg "${oldest_full_age}") \
+    "${source}" \
+    "${target}"
+}
+
 function perform_backup() {
   require_backup_config || return 1
   (
     load_env
-    local dumpfile_path envcopy_path type location passphrase oldest_full_age pgpassfile
+    local dumpfile_path envcopy_path type location passphrase oldest_full_age pgpassfile rc=0
 
     echo -n "Load backup configuration ... "
     type=$(get_backup_config TYPE)
@@ -212,27 +229,24 @@ function perform_backup() {
     cp -a "$(dot_env_file)" "${envcopy_path}"
     echo "OK"
 
-    echo -n "Back up workspace files, PostgreSQL dump, and .env snapshot ... "
-    PASSPHRASE=$passphrase \
-      duplicity incremental \
-      $(duplicity_parameters_for_some_type "${type}") \
-      --full-if-older-than "${oldest_full_age}" \
-      "${WORKSPACE_STORAGE_LOCATION}" \
-      "${location}/workspaces"
-    echo "OK"
+    echo "Back up workspace files, PostgreSQL dump, and .env snapshot ..."
+    run_duplicity_backup "${WORKSPACE_STORAGE_LOCATION}" "${location}/workspaces" \
+      "${type}" "${passphrase}" "${oldest_full_age}" || rc=$?
 
-    echo -n "Back up Forgejo data (repos + SQLite metadata) ... "
-    PASSPHRASE=$passphrase \
-      duplicity incremental \
-      $(duplicity_parameters_for_some_type "${type}") \
-      --full-if-older-than "${oldest_full_age}" \
-      "${FORGEJO_STORAGE_LOCATION}" \
-      "${location}/forgejo"
-    echo "OK"
+    if ((rc == 0)); then
+      echo "Back up Forgejo data (repos + SQLite metadata) ..."
+      run_duplicity_backup "${FORGEJO_STORAGE_LOCATION}" "${location}/forgejo" \
+        "${type}" "${passphrase}" "${oldest_full_age}" || rc=$?
+    fi
 
     echo -n "Remove staged DB dump and env snapshot ... "
     rm "${dumpfile_path}" "${envcopy_path}"
     echo "OK"
+
+    if ((rc != 0)); then
+      echo "Backup FAILED (duplicity exit ${rc}). The data on the remote target may be incomplete."
+    fi
+    return $rc
   )
 }
 function perform_backup_status() {
