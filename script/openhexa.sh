@@ -312,14 +312,25 @@ function perform_restore() {
       return 1
     fi
     pgpassfile=$(begin_pgsql_session localhost "${DATABASE_PORT}" "${DATABASE_USER}" "${DATABASE_PASSWORD}")
-    psql_result=$(PGPASSFILE=$pgpassfile psql -f "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}" template1 2>&1)
+    psql_result=$(PGPASSFILE=$pgpassfile psql -v ON_ERROR_STOP=1 -f "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}" template1 2>&1)
     psql_exit_code=$?
     end_pgsql_session "${pgpassfile}"
     if [[ $psql_exit_code -eq 0 ]]; then
       echo "OK"
       rm "${dumpfile_path}"
     else
-      echo "KO: ${psql_result}"
+      echo "KO"
+      echo
+      echo "===================== PostgreSQL restore FAILED ======================"
+      echo "psql exited with code ${psql_exit_code}. Output:"
+      echo
+      echo "${psql_result}"
+      echo
+      if echo "${psql_result}" | grep -qE 'already exists'; then
+        echo "Hint: the target cluster already contains OpenHEXA databases or roles. Drop them manually first."
+      fi
+      echo "The dump file has been kept at: ${dumpfile_path}"
+      echo "======================================================================"
       return $psql_exit_code
     fi
 

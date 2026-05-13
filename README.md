@@ -307,6 +307,34 @@ After a restore, an `openhexa-env.bak` file is left next to the workspace data:
 compare it with the live `.env` to make sure `ENCRYPTION_KEY`, `SECRET_KEY` and
 the JupyterHub/Forgejo secrets match the restored database.
 
+###### Restoring onto a populated PostgreSQL cluster
+
+`restore` replays a `pg_dumpall` produced without `--clean`, so it expects an empty target cluster (e.g. a fresh install). If the application databases or roles already exist, the `CREATE DATABASE` / `CREATE ROLE` statements will fail, leaving the live data effectively untouched.
+
+To restore on top of an existing setup, drop the application objects manually before running `restore`. Stop the services first so nothing holds open
+connections:
+
+```bash
+# 1. Stop everything that talks to PostgreSQL.
+/usr/share/openhexa/openhexa.sh stop
+
+# 2. Drop the OpenHexa databases and roles as the postgres superuser. Replace
+#    the database/role names below with whatever your `.env` defines (typically
+#    DATABASE_NAME, JUPYTERHUB_DATABASE_NAME, plus any per-workspace databases
+#    matching `[a-z0-9]{16}` that you can list with `\l` in psql).
+sudo -u postgres psql -p "$DATABASE_PORT" <<'SQL'
+DROP DATABASE IF EXISTS "hexa-app";
+DROP DATABASE IF EXISTS "hexa-hub";
+-- repeat DROP DATABASE for every workspace database
+DROP ROLE IF EXISTS "hexa-app";
+DROP ROLE IF EXISTS "hexa-hub";
+-- repeat DROP ROLE for every workspace role
+SQL
+
+# 3. Now run the restore.
+/usr/share/openhexa/openhexa.sh restore
+```
+
 ###### Restoring a pre-Forgejo backup (legacy layout)
 
 Backups taken before the Forgejo upgrade used a single duplicity backend at
