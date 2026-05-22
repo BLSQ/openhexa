@@ -54,6 +54,26 @@ DEFAULT_SOURCE_URL = "https://api.openhexa.org/graphql/"
 PIPELINES_PAGE_SIZE = 50
 VERSIONS_PAGE_SIZE = 50
 
+# Toggled by --debug / -v. Module-global so the gql() and SDK-call wrappers
+# don't need to thread it through every signature.
+DEBUG = False
+
+
+def _dbg(msg: str) -> None:
+    if DEBUG:
+        sys.stderr.write(f"[debug] {msg}\n")
+
+
+def _short(value: Any, limit: int = 200) -> str:
+    """Render a value for debug output without dumping huge zipfiles."""
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"{k}={_short(v, limit)}" for k, v in value.items()) + "}"
+    if isinstance(value, list):
+        head = ", ".join(_short(v, limit) for v in value[:3])
+        return f"[{head}{', ...' if len(value) > 3 else ''}] (n={len(value)})"
+    s = repr(value)
+    return s if len(s) <= limit else s[:limit] + f"... <truncated {len(s) - limit} chars>"
+
 
 # ---------------------------------------------------------------------------
 # .env loading
@@ -92,9 +112,21 @@ def gql(
     operation_name: str | None = None,
 ) -> dict[str, Any]:
     """Execute a raw GraphQL query through the SDK client and return data."""
+    if DEBUG:
+        _dbg(f"-> {operation_name or '<anon>'} @ {client.url}")
+        _dbg(f"   variables: {_short(variables or {})}")
     resp = client.execute(
         query=query, variables=variables or {}, operation_name=operation_name
     )
+    if DEBUG:
+        _dbg(f"<- HTTP {resp.status_code} ({len(resp.content)} bytes)")
+    if not resp.is_success:
+        # Surface the body — the SDK's __str__ only shows the status code,
+        # which loses the actual GraphQL/Django error.
+        raise GraphQLError(
+            f"{operation_name or '<anon>'} returned HTTP {resp.status_code}: "
+            f"{resp.text[:2000]}"
+        )
     return client.get_data(resp)
 
 
@@ -147,8 +179,6 @@ query PipelineDetail($id: UUID!, $vPage: Int!, $vPerPage: Int!) {
                 parameters {
                     code name type multiple required default help
                     widget connection choices
-                    choicesFromFile { path format column }
-                    directory
                 }
             }
         }
@@ -224,8 +254,14 @@ mutation UpdatePipeline($input: UpdatePipelineInput!) {
 """
 
 
-def create_target_workspace(target: Client, src_ws: Any, target_slug: str) -> str:
-    """Create the workspace on target, returning the created slug."""
+def create_target_workspace(target: Client, src_ws: Any) -> str:
+    """Create the workspace on target, returning the slug the server picked.
+
+    Note: the server (see resolve_create_workspace + create_workspace_slug
+    in openhexa-app) ignores any `slug` passed in the input — it derives
+    the slug from the name with a random suffix. So we never pass a slug
+    and always read the actual slug back from the response.
+    """
     countries = [
         CountryInput(code=c.code, alpha3=c.alpha_3, name=c.name, flag=c.flag)
         for c in (src_ws.countries or [])
@@ -233,7 +269,6 @@ def create_target_workspace(target: Client, src_ws: Any, target_slug: str) -> st
     result = target.create_workspace(
         input=CreateWorkspaceInput(
             name=src_ws.name,
-            slug=target_slug,
             description=src_ws.description or "",
             countries=countries,
             load_sample_data=False,
@@ -261,8 +296,15 @@ def create_target_workspace(target: Client, src_ws: Any, target_slug: str) -> st
 
 def create_target_pipeline(
     target: Client, target_slug: str, src_pipeline: dict[str, Any]
-) -> str:
-    """Create an empty pipeline on the target and return its UUID."""
+) -> tuple[str, str]:
+    """Create an empty pipeline on the target and return (id, code).
+
+    The server (see ``Pipeline.objects.create_if_has_perm`` in
+    openhexa-app/.../pipelines/models.py) auto-generates the pipeline
+    code from ``slugify(name)`` with a collision suffix and rejects any
+    code the caller tries to pass. So we never pass a code; we always
+    read the actual one back from the response.
+    """
     is_notebook = src_pipeline.get("type") == "notebook"
     tags = [t["name"] for t in (src_pipeline.get("tags") or [])]
     create_input = CreatePipelineInput(
@@ -279,17 +321,18 @@ def create_target_pipeline(
             f"createPipeline failed for '{src_pipeline['code']}': "
             + ",".join(e.value for e in (result.errors or []))
         )
+    created_code = result.pipeline.code
 
     # createPipeline returns only the code; fetch by code to get the id
     # needed for subsequent updatePipeline.
     created = target.pipeline(
-        workspace_slug=target_slug, pipeline_code=result.pipeline.code
+        workspace_slug=target_slug, pipeline_code=created_code
     )
     if created is None:
         raise GraphQLError(
-            f"could not look up created pipeline '{result.pipeline.code}'"
+            f"could not look up created pipeline '{created_code}'"
         )
-    return str(created.id)
+    return str(created.id), created_code
 
 
 def _clean_parameters(parameters: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -385,7 +428,6 @@ def migrate(
     source: OpenHexaClient,
     target: Client,
     source_slug: str,
-    target_slug: str,
 ) -> None:
     print(f"=> Fetching source workspace '{source_slug}' ...")
     src_ws = source.workspace(slug=source_slug)
@@ -393,13 +435,15 @@ def migrate(
         raise GraphQLError(f"source workspace '{source_slug}' not found")
     print(f"   name: {src_ws.name!r}")
 
-    if target.workspace(slug=target_slug) is not None:
-        raise SystemExit(
-            f"error: target workspace '{target_slug}' already exists; aborting."
+    print("=> Creating target workspace ...")
+    target_slug = create_target_workspace(target, src_ws)
+    print(f"   created with slug '{target_slug}'")
+    if target_slug != source_slug:
+        print(
+            f"   note: the server picked its own slug — '{target_slug}' "
+            f"instead of source slug '{source_slug}'. The createWorkspace "
+            "mutation always derives the slug from the workspace name."
         )
-
-    print(f"=> Creating target workspace '{target_slug}' ...")
-    create_target_workspace(target, src_ws, target_slug)
 
     print("=> Listing source pipelines ...")
     pairs = fetch_source_pipeline_ids(source, source_slug)
@@ -409,19 +453,25 @@ def migrate(
     skipped: list[str] = []
     warnings: list[str] = []
 
-    for pipeline_id, code in pairs:
-        existing = target.pipeline(workspace_slug=target_slug, pipeline_code=code)
+    for pipeline_id, src_code in pairs:
+        existing = target.pipeline(workspace_slug=target_slug, pipeline_code=src_code)
         if existing is not None:
-            print(f"   - pipeline '{code}' already exists on target — skipping")
-            skipped.append(code)
+            print(f"   - pipeline '{src_code}' already exists on target — skipping")
+            skipped.append(src_code)
             continue
 
-        print(f"   - migrating pipeline '{code}' ...")
+        print(f"   - migrating pipeline '{src_code}' ...")
         detail = fetch_source_pipeline_detail(source, pipeline_id)
         is_notebook = detail.get("type") == "notebook"
 
-        target_pid = create_target_pipeline(target, target_slug, detail)
-        print(f"       created pipeline (id={target_pid})")
+        target_pid, target_code = create_target_pipeline(target, target_slug, detail)
+        if target_code != src_code:
+            print(
+                f"       created pipeline as '{target_code}' (source was "
+                f"'{src_code}'; server re-derives code from name) — id={target_pid}"
+            )
+        else:
+            print(f"       created pipeline '{target_code}' (id={target_pid})")
 
         uploaded_names: list[str] = []
         scheduled_version_id: str | None = None
@@ -430,13 +480,13 @@ def migrate(
 
         if is_notebook:
             warnings.append(
-                f"pipeline '{code}' is a notebook pipeline; its source file "
+                f"pipeline '{target_code}' is a notebook pipeline; its source file "
                 f"at notebookPath='{detail.get('notebookPath')}' must be "
                 "copied into the local workspace files for it to run."
             )
             if detail.get("versions"):
                 warnings.append(
-                    f"pipeline '{code}' has {len(detail['versions'])} version(s) "
+                    f"pipeline '{target_code}' has {len(detail['versions'])} version(s) "
                     "on the source, but uploadPipeline is not supported for "
                     "notebook pipelines — versions were not migrated."
                 )
@@ -444,11 +494,11 @@ def migrate(
             versions = detail.get("versions") or []
             if not versions:
                 warnings.append(
-                    f"pipeline '{code}' has no versions on source; "
+                    f"pipeline '{target_code}' has no versions on source; "
                     "created with no version."
                 )
             for v in versions:
-                up = upload_pipeline_version(target, target_slug, code, v)
+                up = upload_pipeline_version(target, target_slug, target_code, v)
                 uploaded_names.append(up["versionName"])
                 print(
                     f"       uploaded version v{v['versionNumber']} "
@@ -462,7 +512,7 @@ def migrate(
 
         update_pipeline_settings(target, target_pid, detail, scheduled_version_id)
 
-        created_summary.append((code, uploaded_names))
+        created_summary.append((target_code, uploaded_names))
 
     # ----------- summary -----------
     print("\n=== Migration summary ===")
@@ -508,10 +558,6 @@ def main() -> int:
         help="Slug of the source workspace on the remote server.",
     )
     parser.add_argument(
-        "--target-slug",
-        help="Slug to use locally (defaults to the source slug).",
-    )
-    parser.add_argument(
         "--source-url",
         default=DEFAULT_SOURCE_URL,
         help=f"Source GraphQL endpoint (default: {DEFAULT_SOURCE_URL}).",
@@ -526,7 +572,15 @@ def main() -> int:
         help="Override the local GraphQL endpoint (default derived from "
         "APP_PORT in .env: http://localhost:${APP_PORT}/graphql/).",
     )
+    parser.add_argument(
+        "--debug", "-v",
+        action="store_true",
+        help="Print each GraphQL request (operation + variables) and response status.",
+    )
     args = parser.parse_args()
+
+    global DEBUG
+    DEBUG = args.debug
 
     env_path = Path(args.env_file)
     if not env_path.exists():
@@ -546,7 +600,6 @@ def main() -> int:
     target_url = args.target_url or urljoin(
         f"http://localhost:{env.get('APP_PORT', '8000')}/", "graphql/"
     )
-    target_slug = args.target_slug or args.slug
 
     print(f"Source: {args.source_url}")
     print(f"Target: {target_url}")
@@ -554,12 +607,22 @@ def main() -> int:
     try:
         source = build_source(args.source_url, args.token)
         target = build_target(target_url, superuser, password)
-        migrate(source, target, args.slug, target_slug)
-    except (
-        GraphQLError,
-        GraphQLClientGraphQLMultiError,
-        GraphQLClientHttpError,
-    ) as exc:
+        migrate(source, target, args.slug)
+    except GraphQLClientHttpError as exc:
+        # SDK's __str__ only includes the status code. Print the body too.
+        sys.stderr.write(
+            f"\nerror: HTTP {exc.status_code} from server:\n{exc.response.text[:4000]}\n"
+        )
+        return 1
+    except GraphQLClientGraphQLMultiError as exc:
+        sys.stderr.write("\nerror: GraphQL errors from server:\n")
+        for e in exc.errors:
+            sys.stderr.write(f"  - {e.message}")
+            if e.path:
+                sys.stderr.write(f"  (at path: {'.'.join(map(str, e.path))})")
+            sys.stderr.write("\n")
+        return 1
+    except GraphQLError as exc:
         sys.stderr.write(f"\nerror: {exc}\n")
         return 1
     return 0
