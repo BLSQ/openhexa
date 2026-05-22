@@ -440,7 +440,7 @@ sudo systemctl start openhexa
 
 The package post-install hook runs `update` and `prepare` automatically when
 installing for the first time, but on upgrades you should re-run them
-explicitly to apply Django migrations introduced between 4.6.0 and 5.5.0
+explicitly to apply Django migrations introduced between 4.6.0 and 5.6.2
 (custom webapp domains, AI agent tables, scheduled-run version selection,
 read-only table protection).
 

@@ -1,7 +1,7 @@
 openhexa (4.0-1) stable; urgency=medium
 
   [ Bram Jans ]
-  * Update OpenHEXA to version 5.5.0
+  * Update OpenHEXA to version 5.6.2
   * Breaking: add Forgejo Git server (required for Static Webapps since
     OpenHEXA 5.0.0). New `forgejo` service backed by a `forgejo_data`
     volume, listening on host port 3100.

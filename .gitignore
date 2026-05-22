@@ -9,4 +9,5 @@ forgejo_data/
 backup.conf*
 backup/
 workspaces-*
+forgejo_data-*
 .artifacts/
