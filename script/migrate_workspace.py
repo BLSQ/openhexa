@@ -10,29 +10,42 @@ session cookie via the GraphQL ``login`` mutation.
 Scope:
   - Workspace metadata (name, description, dockerImage, configuration,
     countries) is migrated.
-  - All pipelines and all their versions (zipfile bytes + parameters +
-    per-version metadata) are migrated.
-  - Pipeline-level fields (schedule, config, webhookEnabled, tags,
-    functionalType, scheduledPipelineVersion) are applied after upload.
+  - Each pipeline is created via createPipeline; each zipfile-pipeline
+    version is uploaded via uploadPipeline; pipeline-level schedule /
+    config / webhookEnabled / scheduledPipelineVersionId are applied via
+    updatePipeline.
 
 Out of scope: members, invitations, connections, recipients, templates,
-runs, shortcuts, workspace files, datasets, database tables.
+runs, shortcuts, workspace files, datasets, database tables. Notebook
+pipelines are created with their notebookPath but the notebook file
+itself is not migrated (a warning is emitted).
 """
 
 import argparse
 import base64
-import json
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 try:
-    import requests
+    import httpx
+    from openhexa.graphql.graphql_client.client import Client
+    from openhexa.graphql.graphql_client.exceptions import (
+        GraphQLClientGraphQLMultiError,
+        GraphQLClientHttpError,
+    )
+    from openhexa.graphql.graphql_client.input_types import (
+        CountryInput,
+        CreatePipelineInput,
+        CreateWorkspaceInput,
+        UpdateWorkspaceInput,
+    )
+    from openhexa.sdk.utils import OpenHexaClient
 except ImportError:
     sys.stderr.write(
-        "error: this script requires the 'requests' package "
-        "(install with: pip install requests)\n"
+        "error: this script requires the 'openhexa.sdk' package "
+        "(install with: pip install openhexa.sdk)\n"
     )
     sys.exit(1)
 
@@ -45,6 +58,7 @@ VERSIONS_PAGE_SIZE = 50
 # ---------------------------------------------------------------------------
 # .env loading
 # ---------------------------------------------------------------------------
+
 
 def parse_env_file(path: Path) -> dict[str, str]:
     env: dict[str, str] = {}
@@ -63,150 +77,76 @@ def parse_env_file(path: Path) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# GraphQL client
+# GraphQL transport (SDK-backed)
 # ---------------------------------------------------------------------------
+
 
 class GraphQLError(RuntimeError):
     pass
 
 
-class GraphQLClient:
-    def __init__(self, url: str, label: str):
-        self.url = url
-        self.label = label
-        self.session = requests.Session()
-        self.session.headers["Accept"] = "application/json"
-
-    def _csrf_priming_get(self) -> None:
-        """Trigger Django to set the csrftoken cookie."""
-        self.session.get(self.url, timeout=30)
-
-    def _maybe_csrf_header(self) -> dict[str, str]:
-        token = self.session.cookies.get("csrftoken")
-        if not token:
-            return {}
-        return {
-            "X-CSRFToken": token,
-            "Referer": f"{urlparse(self.url).scheme}://{urlparse(self.url).netloc}/",
-        }
-
-    def execute(
-        self, query: str, variables: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        payload = {"query": query, "variables": variables or {}}
-        headers = {"Content-Type": "application/json", **self._maybe_csrf_header()}
-        resp = self.session.post(
-            self.url, data=json.dumps(payload), headers=headers, timeout=120
-        )
-        if resp.status_code != 200:
-            raise GraphQLError(
-                f"[{self.label}] HTTP {resp.status_code}: {resp.text[:500]}"
-            )
-        body = resp.json()
-        if body.get("errors"):
-            raise GraphQLError(
-                f"[{self.label}] GraphQL errors: "
-                + json.dumps(body["errors"], indent=2)
-            )
-        return body["data"]
-
-
-def build_source_client(url: str, token: str) -> GraphQLClient:
-    client = GraphQLClient(url, label="source")
-    client.session.headers["Authorization"] = f"Bearer {token}"
-    # Bearer-auth POSTs don't need a CSRF token (no session cookie), but
-    # priming costs nothing and is harmless.
-    client._csrf_priming_get()
-    return client
-
-
-def build_target_client(url: str, email: str, password: str) -> GraphQLClient:
-    client = GraphQLClient(url, label="target")
-    client._csrf_priming_get()
-    data = client.execute(
-        """
-        mutation Login($input: LoginInput!) {
-            login(input: $input) { success errors }
-        }
-        """,
-        {"input": {"email": email, "password": password}},
+def gql(
+    client: Client,
+    query: str,
+    variables: dict[str, Any] | None = None,
+    operation_name: str | None = None,
+) -> dict[str, Any]:
+    """Execute a raw GraphQL query through the SDK client and return data."""
+    resp = client.execute(
+        query=query, variables=variables or {}, operation_name=operation_name
     )
-    result = data["login"]
-    if not result["success"]:
+    return client.get_data(resp)
+
+
+def build_source(server_url: str, token: str) -> OpenHexaClient:
+    return OpenHexaClient(token=token, server_url=server_url)
+
+
+def build_target(target_url: str, email: str, password: str) -> Client:
+    http = httpx.Client(headers={"User-Agent": "openhexa-migrate/1.0"})
+    # Prime CSRF cookie. Defensive — GraphQLView is csrf_exempt on the
+    # current backend, but a future change would otherwise silently
+    # break every mutation.
+    http.get(target_url)
+    csrf = http.cookies.get("csrftoken")
+    if csrf:
+        http.headers["X-CSRFToken"] = csrf
+        http.headers["Referer"] = target_url
+
+    client = Client(url=target_url, http_client=http)
+    data = gql(
+        client,
+        "mutation Login($input: LoginInput!) { login(input: $input) { success errors } }",
+        {"input": {"email": email, "password": password}},
+        "Login",
+    )
+    if not data["login"]["success"]:
         raise GraphQLError(
-            "target login failed: " + ",".join(result.get("errors") or [])
+            "target login failed: " + ",".join(data["login"]["errors"] or [])
         )
     return client
 
 
 # ---------------------------------------------------------------------------
-# Fetch from source
+# Source fetch helpers
 # ---------------------------------------------------------------------------
 
-WORKSPACE_QUERY = """
-query SourceWorkspace($slug: String!) {
-    workspace(slug: $slug) {
-        slug
-        name
-        description
-        dockerImage
-        configuration
-        countries { code alpha3 name flag }
-    }
-}
-"""
-
-PIPELINES_QUERY = """
-query SourcePipelines($slug: String!, $page: Int!, $perPage: Int!) {
-    pipelines(workspaceSlug: $slug, page: $page, perPage: $perPage) {
-        pageNumber
-        totalPages
-        totalItems
-        items {
-            id
-            code
-            name
-            description
-            type
-            functionalType
-            notebookPath
-            schedule
-            config
-            webhookEnabled
-            tags { name }
-            scheduledPipelineVersion { id versionNumber }
-        }
-    }
-}
-"""
-
-VERSIONS_QUERY = """
-query SourcePipelineVersions($id: UUID!, $page: Int!, $perPage: Int!) {
+PIPELINE_DETAIL_QUERY = """
+query PipelineDetail($id: UUID!, $vPage: Int!, $vPerPage: Int!) {
     pipeline(id: $id) {
-        versions(page: $page, perPage: $perPage) {
+        id code name description type functionalType notebookPath
+        schedule config webhookEnabled
+        tags { name }
+        scheduledPipelineVersion { id versionNumber }
+        versions(page: $vPage, perPage: $vPerPage) {
             pageNumber
             totalPages
-            totalItems
             items {
-                id
-                versionNumber
-                name
-                description
-                externalLink
-                config
-                timeout
+                id versionNumber name description externalLink config timeout
                 zipfile
                 parameters {
-                    code
-                    name
-                    type
-                    multiple
-                    required
-                    default
-                    help
-                    widget
-                    connection
-                    choices
+                    code name type multiple required default help
+                    widget connection choices
                     choicesFromFile { path format column }
                     directory
                 }
@@ -217,86 +157,55 @@ query SourcePipelineVersions($id: UUID!, $page: Int!, $perPage: Int!) {
 """
 
 
-def fetch_source_workspace(client: GraphQLClient, slug: str) -> dict[str, Any]:
-    data = client.execute(WORKSPACE_QUERY, {"slug": slug})
-    if data["workspace"] is None:
-        raise GraphQLError(f"source workspace '{slug}' not found")
-    return data["workspace"]
-
-
-def fetch_source_pipelines(
-    client: GraphQLClient, slug: str
-) -> list[dict[str, Any]]:
-    pipelines: list[dict[str, Any]] = []
+def fetch_source_pipeline_ids(
+    source: OpenHexaClient, slug: str
+) -> list[tuple[str, str]]:
+    """Return [(pipeline_id, pipeline_code), ...] across all pages."""
+    pairs: list[tuple[str, str]] = []
     page = 1
     while True:
-        data = client.execute(
-            PIPELINES_QUERY,
-            {"slug": slug, "page": page, "perPage": PIPELINES_PAGE_SIZE},
+        result = source.pipelines(
+            workspace_slug=slug, page=page, per_page=PIPELINES_PAGE_SIZE
         )
-        result = data["pipelines"]
-        pipelines.extend(result["items"])
-        if page >= result["totalPages"] or result["totalPages"] == 0:
+        pairs.extend((str(item.id), item.code) for item in result.items)
+        if page >= result.total_pages or result.total_pages == 0:
             break
         page += 1
-    return pipelines
+    return pairs
 
 
-def fetch_pipeline_versions(
-    client: GraphQLClient, pipeline_id: str
-) -> list[dict[str, Any]]:
-    versions: list[dict[str, Any]] = []
-    page = 1
-    while True:
-        data = client.execute(
-            VERSIONS_QUERY,
-            {"id": pipeline_id, "page": page, "perPage": VERSIONS_PAGE_SIZE},
+def fetch_source_pipeline_detail(
+    source: OpenHexaClient, pipeline_id: str
+) -> dict[str, Any]:
+    """Fetch full pipeline data + all versions for one pipeline."""
+    first = gql(
+        source,
+        PIPELINE_DETAIL_QUERY,
+        {"id": pipeline_id, "vPage": 1, "vPerPage": VERSIONS_PAGE_SIZE},
+        "PipelineDetail",
+    )
+    detail = first["pipeline"]
+    if detail is None:
+        raise GraphQLError(f"source pipeline id={pipeline_id} disappeared")
+    versions = list(detail["versions"]["items"])
+    total_pages = detail["versions"]["totalPages"]
+    for vpage in range(2, total_pages + 1):
+        more = gql(
+            source,
+            PIPELINE_DETAIL_QUERY,
+            {"id": pipeline_id, "vPage": vpage, "vPerPage": VERSIONS_PAGE_SIZE},
+            "PipelineDetail",
         )
-        result = data["pipeline"]["versions"]
-        versions.extend(result["items"])
-        if page >= result["totalPages"] or result["totalPages"] == 0:
-            break
-        page += 1
-    # Upload oldest first so versionNumber order is preserved locally.
-    versions.sort(key=lambda v: v["versionNumber"])
-    return versions
+        versions.extend(more["pipeline"]["versions"]["items"])
+    detail["versions"] = sorted(versions, key=lambda v: v["versionNumber"])
+    return detail
 
 
 # ---------------------------------------------------------------------------
-# Apply to target
+# Target apply helpers
 # ---------------------------------------------------------------------------
 
-TARGET_WORKSPACE_QUERY = """
-query TargetWorkspace($slug: String!) {
-    workspace(slug: $slug) { slug }
-}
-"""
-
-TARGET_PIPELINE_QUERY = """
-query TargetPipeline($slug: String!, $code: String!) {
-    pipelineByCode(workspaceSlug: $slug, code: $code) { id code }
-}
-"""
-
-CREATE_WORKSPACE = """
-mutation CreateWorkspace($input: CreateWorkspaceInput!) {
-    createWorkspace(input: $input) {
-        success errors
-        workspace { slug name }
-    }
-}
-"""
-
-UPDATE_WORKSPACE = """
-mutation UpdateWorkspace($input: UpdateWorkspaceInput!) {
-    updateWorkspace(input: $input) {
-        success errors
-        workspace { slug }
-    }
-}
-"""
-
-UPLOAD_PIPELINE = """
+UPLOAD_PIPELINE_MUTATION = """
 mutation UploadPipeline($input: UploadPipelineInput!) {
     uploadPipeline(input: $input) {
         success errors details
@@ -305,83 +214,82 @@ mutation UploadPipeline($input: UploadPipelineInput!) {
 }
 """
 
-UPDATE_PIPELINE = """
+UPDATE_PIPELINE_MUTATION = """
 mutation UpdatePipeline($input: UpdatePipelineInput!) {
     updatePipeline(input: $input) {
         success errors
-        pipeline { id code name }
+        pipeline { id code }
     }
 }
 """
 
 
-def target_workspace_exists(client: GraphQLClient, slug: str) -> bool:
-    try:
-        data = client.execute(TARGET_WORKSPACE_QUERY, {"slug": slug})
-    except GraphQLError:
-        return False
-    return data.get("workspace") is not None
-
-
-def target_pipeline_get(
-    client: GraphQLClient, slug: str, code: str
-) -> dict[str, Any] | None:
-    try:
-        data = client.execute(
-            TARGET_PIPELINE_QUERY, {"slug": slug, "code": code}
-        )
-    except GraphQLError:
-        return None
-    return data.get("pipelineByCode")
-
-
-def create_target_workspace(
-    client: GraphQLClient, src_ws: dict[str, Any], target_slug: str
-) -> dict[str, Any]:
+def create_target_workspace(target: Client, src_ws: Any, target_slug: str) -> str:
+    """Create the workspace on target, returning the created slug."""
     countries = [
-        {
-            "code": c["code"],
-            "alpha3": c.get("alpha3"),
-            "name": c.get("name"),
-            "flag": c.get("flag"),
-        }
-        for c in (src_ws.get("countries") or [])
+        CountryInput(code=c.code, alpha3=c.alpha_3, name=c.name, flag=c.flag)
+        for c in (src_ws.countries or [])
     ]
-    input_ = {
-        "name": src_ws["name"],
-        "slug": target_slug,
-        "description": src_ws.get("description") or "",
-        "countries": countries,
-        "loadSampleData": False,
-        "configuration": src_ws.get("configuration") or {},
-    }
-    data = client.execute(CREATE_WORKSPACE, {"input": input_})
-    result = data["createWorkspace"]
-    if not result["success"]:
-        raise GraphQLError(
-            "createWorkspace failed: " + ",".join(result.get("errors") or [])
+    result = target.create_workspace(
+        input=CreateWorkspaceInput(
+            name=src_ws.name,
+            slug=target_slug,
+            description=src_ws.description or "",
+            countries=countries,
+            load_sample_data=False,
+            configuration=src_ws.configuration or {},
         )
-    created_slug = result["workspace"]["slug"]
+    )
+    if not result.success or result.workspace is None:
+        raise GraphQLError("createWorkspace failed: " + ",".join(result.errors or []))
+    created_slug = result.workspace.slug
 
-    docker_image = src_ws.get("dockerImage")
-    if docker_image:
-        data = client.execute(
-            UPDATE_WORKSPACE,
-            {
-                "input": {
-                    "slug": created_slug,
-                    "dockerImage": docker_image,
-                }
-            },
+    if src_ws.docker_image:
+        upd = target.update_workspace(
+            input=UpdateWorkspaceInput(
+                slug=created_slug, docker_image=src_ws.docker_image
+            )
         )
-        upd = data["updateWorkspace"]
-        if not upd["success"]:
+        if not upd.success:
             print(
-                f"  warning: could not set dockerImage='{docker_image}': "
-                + ",".join(upd.get("errors") or []),
+                f"  warning: could not set dockerImage="
+                f"'{src_ws.docker_image}': " + ",".join(upd.errors or []),
                 file=sys.stderr,
             )
-    return result["workspace"]
+    return created_slug
+
+
+def create_target_pipeline(
+    target: Client, target_slug: str, src_pipeline: dict[str, Any]
+) -> str:
+    """Create an empty pipeline on the target and return its UUID."""
+    is_notebook = src_pipeline.get("type") == "notebook"
+    tags = [t["name"] for t in (src_pipeline.get("tags") or [])]
+    create_input = CreatePipelineInput(
+        name=src_pipeline["name"] or src_pipeline["code"],
+        description=src_pipeline.get("description") or None,
+        workspace_slug=target_slug,
+        notebook_path=src_pipeline.get("notebookPath") if is_notebook else None,
+        functional_type=src_pipeline.get("functionalType"),
+        tags=tags or None,
+    )
+    result = target.create_pipeline(input=create_input)
+    if not result.success or result.pipeline is None:
+        raise GraphQLError(
+            f"createPipeline failed for '{src_pipeline['code']}': "
+            + ",".join(e.value for e in (result.errors or []))
+        )
+
+    # createPipeline returns only the code; fetch by code to get the id
+    # needed for subsequent updatePipeline.
+    created = target.pipeline(
+        workspace_slug=target_slug, pipeline_code=result.pipeline.code
+    )
+    if created is None:
+        raise GraphQLError(
+            f"could not look up created pipeline '{result.pipeline.code}'"
+        )
+    return str(created.id)
 
 
 def _clean_parameters(parameters: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -391,22 +299,18 @@ def _clean_parameters(parameters: list[dict[str, Any]]) -> list[dict[str, Any]]:
         item = {k: v for k, v in p.items() if v is not None}
         cfile = item.get("choicesFromFile")
         if cfile is not None:
-            item["choicesFromFile"] = {
-                k: v for k, v in cfile.items() if v is not None
-            }
+            item["choicesFromFile"] = {k: v for k, v in cfile.items() if v is not None}
         cleaned.append(item)
     return cleaned
 
 
 def upload_pipeline_version(
-    client: GraphQLClient,
+    target: Client,
     workspace_slug: str,
     pipeline_code: str,
     version: dict[str, Any],
-    pipeline_meta: dict[str, Any],
 ) -> dict[str, Any]:
-    # zipfile from source is already base64-encoded (per schema).
-    # We forward it verbatim, but defensively re-validate it decodes.
+    """Upload one version to an existing target pipeline."""
     try:
         base64.b64decode(version["zipfile"], validate=True)
     except Exception as exc:
@@ -414,7 +318,6 @@ def upload_pipeline_version(
             f"version {version['versionNumber']} has invalid base64 zipfile: {exc}"
         )
 
-    tags = [t["name"] for t in (pipeline_meta.get("tags") or [])]
     input_: dict[str, Any] = {
         "workspaceSlug": workspace_slug,
         "pipelineCode": pipeline_code,
@@ -425,42 +328,46 @@ def upload_pipeline_version(
         "zipfile": version["zipfile"],
         "config": version.get("config") or {},
         "timeout": version.get("timeout"),
-        "tags": tags,
-        "functionalType": pipeline_meta.get("functionalType"),
     }
     input_ = {k: v for k, v in input_.items() if v is not None}
-    data = client.execute(UPLOAD_PIPELINE, {"input": input_})
+    data = gql(target, UPLOAD_PIPELINE_MUTATION, {"input": input_}, "UploadPipeline")
     result = data["uploadPipeline"]
     if not result["success"]:
         raise GraphQLError(
             f"uploadPipeline failed for {pipeline_code} v{version['versionNumber']}: "
             + ",".join(result.get("errors") or [])
-            + (f" ({result.get('details')})" if result.get("details") else "")
+            + (f" ({result['details']})" if result.get("details") else "")
         )
     return result["pipelineVersion"]
 
 
-def update_pipeline_after_upload(
-    client: GraphQLClient,
+def update_pipeline_settings(
+    target: Client,
     target_pipeline_id: str,
     src_pipeline: dict[str, Any],
     scheduled_version_id: str | None,
 ) -> None:
-    tags = [t["name"] for t in (src_pipeline.get("tags") or [])]
+    """Apply pipeline-level fields that createPipeline/uploadPipeline cannot set."""
     input_: dict[str, Any] = {
         "id": target_pipeline_id,
-        "name": src_pipeline.get("name"),
-        "description": src_pipeline.get("description"),
-        "config": src_pipeline.get("config") or {},
         "schedule": src_pipeline.get("schedule"),
         "webhookEnabled": src_pipeline.get("webhookEnabled"),
-        "autoUpdateFromTemplate": False,
-        "tags": tags,
-        "functionalType": src_pipeline.get("functionalType"),
+        "config": src_pipeline.get("config") or None,
         "scheduledPipelineVersionId": scheduled_version_id,
+        "autoUpdateFromTemplate": False,
     }
+    # Only call updatePipeline if at least one migrated field has a value.
+    meaningful = {
+        k: v
+        for k, v in input_.items()
+        if k != "id"
+        and k != "autoUpdateFromTemplate"
+        and v not in (None, False, {}, "")
+    }
+    if not meaningful:
+        return
     input_ = {k: v for k, v in input_.items() if v is not None}
-    data = client.execute(UPDATE_PIPELINE, {"input": input_})
+    data = gql(target, UPDATE_PIPELINE_MUTATION, {"input": input_}, "UpdatePipeline")
     result = data["updatePipeline"]
     if not result["success"]:
         raise GraphQLError(
@@ -473,92 +380,93 @@ def update_pipeline_after_upload(
 # Orchestration
 # ---------------------------------------------------------------------------
 
+
 def migrate(
-    src: GraphQLClient,
-    dst: GraphQLClient,
+    source: OpenHexaClient,
+    target: Client,
     source_slug: str,
     target_slug: str,
 ) -> None:
     print(f"=> Fetching source workspace '{source_slug}' ...")
-    src_ws = fetch_source_workspace(src, source_slug)
-    print(f"   name: {src_ws['name']!r}")
+    src_ws = source.workspace(slug=source_slug)
+    if src_ws is None:
+        raise GraphQLError(f"source workspace '{source_slug}' not found")
+    print(f"   name: {src_ws.name!r}")
 
-    if target_workspace_exists(dst, target_slug):
+    if target.workspace(slug=target_slug) is not None:
         raise SystemExit(
             f"error: target workspace '{target_slug}' already exists; aborting."
         )
 
     print(f"=> Creating target workspace '{target_slug}' ...")
-    create_target_workspace(dst, src_ws, target_slug)
+    create_target_workspace(target, src_ws, target_slug)
 
     print("=> Listing source pipelines ...")
-    src_pipelines = fetch_source_pipelines(src, source_slug)
-    print(f"   found {len(src_pipelines)} pipeline(s)")
+    pairs = fetch_source_pipeline_ids(source, source_slug)
+    print(f"   found {len(pairs)} pipeline(s)")
 
     created_summary: list[tuple[str, list[str]]] = []
     skipped: list[str] = []
     warnings: list[str] = []
 
-    for pipeline in src_pipelines:
-        code = pipeline["code"]
-        existing = target_pipeline_get(dst, target_slug, code)
+    for pipeline_id, code in pairs:
+        existing = target.pipeline(workspace_slug=target_slug, pipeline_code=code)
         if existing is not None:
-            msg = f"pipeline '{code}' already exists on target — skipping"
-            print(f"   - {msg}")
+            print(f"   - pipeline '{code}' already exists on target — skipping")
             skipped.append(code)
             continue
 
-        if pipeline.get("type") == "notebook":
-            warnings.append(
-                f"pipeline '{code}' is a notebook pipeline; its source file "
-                f"at notebookPath='{pipeline.get('notebookPath')}' must be "
-                "copied into the local workspace files for it to run."
-            )
+        print(f"   - migrating pipeline '{code}' ...")
+        detail = fetch_source_pipeline_detail(source, pipeline_id)
+        is_notebook = detail.get("type") == "notebook"
 
-        print(f"   - migrating pipeline '{code}' ({pipeline['name']!r})")
-        versions = fetch_pipeline_versions(src, pipeline["id"])
-        if not versions:
-            warnings.append(
-                f"pipeline '{code}' has no versions on source; nothing uploaded."
-            )
-            continue
+        target_pid = create_target_pipeline(target, target_slug, detail)
+        print(f"       created pipeline (id={target_pid})")
 
-        uploaded_versions: list[dict[str, Any]] = []
+        uploaded_names: list[str] = []
         scheduled_version_id: str | None = None
-        scheduled_src = pipeline.get("scheduledPipelineVersion") or {}
+        scheduled_src = detail.get("scheduledPipelineVersion") or {}
         scheduled_src_number = scheduled_src.get("versionNumber")
 
-        for v in versions:
-            up = upload_pipeline_version(
-                dst, target_slug, code, v, pipeline
+        if is_notebook:
+            warnings.append(
+                f"pipeline '{code}' is a notebook pipeline; its source file "
+                f"at notebookPath='{detail.get('notebookPath')}' must be "
+                "copied into the local workspace files for it to run."
             )
-            uploaded_versions.append(up)
-            print(
-                f"       uploaded version v{v['versionNumber']} "
-                f"-> {up['versionName']}"
-            )
-            if (
-                scheduled_src_number is not None
-                and up.get("versionNumber") == scheduled_src_number
-            ):
-                scheduled_version_id = up["id"]
+            if detail.get("versions"):
+                warnings.append(
+                    f"pipeline '{code}' has {len(detail['versions'])} version(s) "
+                    "on the source, but uploadPipeline is not supported for "
+                    "notebook pipelines — versions were not migrated."
+                )
+        else:
+            versions = detail.get("versions") or []
+            if not versions:
+                warnings.append(
+                    f"pipeline '{code}' has no versions on source; "
+                    "created with no version."
+                )
+            for v in versions:
+                up = upload_pipeline_version(target, target_slug, code, v)
+                uploaded_names.append(up["versionName"])
+                print(
+                    f"       uploaded version v{v['versionNumber']} "
+                    f"-> {up['versionName']}"
+                )
+                if (
+                    scheduled_src_number is not None
+                    and up.get("versionNumber") == scheduled_src_number
+                ):
+                    scheduled_version_id = up["id"]
 
-        target_pipeline = target_pipeline_get(dst, target_slug, code)
-        if target_pipeline is None:
-            raise GraphQLError(
-                f"could not find pipeline '{code}' on target after upload"
-            )
-        update_pipeline_after_upload(
-            dst, target_pipeline["id"], pipeline, scheduled_version_id
-        )
+        update_pipeline_settings(target, target_pid, detail, scheduled_version_id)
 
-        created_summary.append(
-            (code, [v["versionName"] for v in uploaded_versions])
-        )
+        created_summary.append((code, uploaded_names))
 
     # ----------- summary -----------
     print("\n=== Migration summary ===")
-    print(f"Workspace: {src_ws['name']!r} -> slug '{target_slug}'")
+    print(f"Workspace: {src_ws.name!r} -> slug '{target_slug}'")
     print(f"Pipelines created: {len(created_summary)}")
     for code, vnames in created_summary:
         print(f"  * {code}")
@@ -572,13 +480,16 @@ def migrate(
         print("Warnings:")
         for w in warnings:
             print(f"  - {w}")
-    print("Note: connections were not migrated; recreate them locally if "
-          "any pipeline depends on connection-typed parameters.")
+    print(
+        "Note: connections were not migrated; recreate them locally if "
+        "any pipeline depends on connection-typed parameters."
+    )
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -586,12 +497,14 @@ def main() -> int:
         "to the local Docker setup.",
     )
     parser.add_argument(
-        "--token", required=True,
+        "--token",
+        required=True,
         help="WorkspaceMembership access token from the source server "
-             "(same token used by the OpenHEXA CLI).",
+        "(same token used by the OpenHEXA CLI).",
     )
     parser.add_argument(
-        "--slug", required=True,
+        "--slug",
+        required=True,
         help="Slug of the source workspace on the remote server.",
     )
     parser.add_argument(
@@ -599,7 +512,8 @@ def main() -> int:
         help="Slug to use locally (defaults to the source slug).",
     )
     parser.add_argument(
-        "--source-url", default=DEFAULT_SOURCE_URL,
+        "--source-url",
+        default=DEFAULT_SOURCE_URL,
         help=f"Source GraphQL endpoint (default: {DEFAULT_SOURCE_URL}).",
     )
     parser.add_argument(
@@ -610,7 +524,7 @@ def main() -> int:
     parser.add_argument(
         "--target-url",
         help="Override the local GraphQL endpoint (default derived from "
-             "APP_PORT in .env: http://localhost:${APP_PORT}/graphql/).",
+        "APP_PORT in .env: http://localhost:${APP_PORT}/graphql/).",
     )
     args = parser.parse_args()
 
@@ -638,10 +552,14 @@ def main() -> int:
     print(f"Target: {target_url}")
 
     try:
-        src = build_source_client(args.source_url, args.token)
-        dst = build_target_client(target_url, superuser, password)
-        migrate(src, dst, args.slug, target_slug)
-    except GraphQLError as exc:
+        source = build_source(args.source_url, args.token)
+        target = build_target(target_url, superuser, password)
+        migrate(source, target, args.slug, target_slug)
+    except (
+        GraphQLError,
+        GraphQLClientGraphQLMultiError,
+        GraphQLClientHttpError,
+    ) as exc:
         sys.stderr.write(f"\nerror: {exc}\n")
         return 1
     return 0
