@@ -4,8 +4,8 @@
 Source auth: WorkspaceMembership.access_token (the same token format the
 OpenHEXA CLI uses), sent as ``Authorization: Bearer <token>``.
 
-Target auth: Django superuser email/password from .env, exchanged for a
-session cookie via the GraphQL ``login`` mutation.
+Target auth: Django superuser email/password passed via CLI flags,
+exchanged for a session cookie via the GraphQL ``login`` mutation.
 
 Scope:
   - Workspace metadata (name, description, dockerImage, configuration,
@@ -24,9 +24,7 @@ itself is not migrated (a warning is emitted).
 import argparse
 import base64
 import sys
-from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
 
 try:
     import httpx
@@ -51,6 +49,7 @@ except ImportError:
 
 
 DEFAULT_SOURCE_URL = "https://api.openhexa.org/graphql/"
+DEFAULT_TARGET_URL = "http://localhost:8000/graphql/"
 PIPELINES_PAGE_SIZE = 50
 VERSIONS_PAGE_SIZE = 50
 
@@ -73,27 +72,6 @@ def _short(value: Any, limit: int = 200) -> str:
         return f"[{head}{', ...' if len(value) > 3 else ''}] (n={len(value)})"
     s = repr(value)
     return s if len(s) <= limit else s[:limit] + f"... <truncated {len(s) - limit} chars>"
-
-
-# ---------------------------------------------------------------------------
-# .env loading
-# ---------------------------------------------------------------------------
-
-
-def parse_env_file(path: Path) -> dict[str, str]:
-    env: dict[str, str] = {}
-    for raw in path.read_text().splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        value = value.strip()
-        if (value.startswith("'") and value.endswith("'")) or (
-            value.startswith('"') and value.endswith('"')
-        ):
-            value = value[1:-1]
-        env[key.strip()] = value
-    return env
 
 
 # ---------------------------------------------------------------------------
@@ -689,14 +667,19 @@ def main() -> int:
         help=f"Source GraphQL endpoint (default: {DEFAULT_SOURCE_URL}).",
     )
     parser.add_argument(
-        "--env-file",
-        default=str(Path(__file__).resolve().parent.parent / ".env"),
-        help="Path to the .env file (default: repo .env).",
+        "--target-url",
+        default=DEFAULT_TARGET_URL,
+        help=f"Local GraphQL endpoint (default: {DEFAULT_TARGET_URL}).",
     )
     parser.add_argument(
-        "--target-url",
-        help="Override the local GraphQL endpoint (default derived from "
-        "APP_PORT in .env: http://localhost:${APP_PORT}/graphql/).",
+        "--target-email",
+        required=True,
+        help="Email of the Django superuser on the target server.",
+    )
+    parser.add_argument(
+        "--target-password",
+        required=True,
+        help="Password of the Django superuser on the target server.",
     )
     parser.add_argument(
         "--debug", "-v",
@@ -708,31 +691,12 @@ def main() -> int:
     global DEBUG
     DEBUG = args.debug
 
-    env_path = Path(args.env_file)
-    if not env_path.exists():
-        sys.stderr.write(f"error: env file not found: {env_path}\n")
-        return 2
-    env = parse_env_file(env_path)
-
-    superuser = env.get("DJANGO_SUPERUSER_USERNAME")
-    password = env.get("DJANGO_SUPERUSER_PASSWORD")
-    if not superuser or not password:
-        sys.stderr.write(
-            "error: DJANGO_SUPERUSER_USERNAME and DJANGO_SUPERUSER_PASSWORD "
-            "must be set in the env file.\n"
-        )
-        return 2
-
-    target_url = args.target_url or urljoin(
-        f"http://localhost:{env.get('APP_PORT', '8000')}/", "graphql/"
-    )
-
     print(f"Source: {args.source_url}")
-    print(f"Target: {target_url}")
+    print(f"Target: {args.target_url}")
 
     try:
         source = build_source(args.source_url, args.token)
-        target = build_target(target_url, superuser, password)
+        target = build_target(args.target_url, args.target_email, args.target_password)
         migrate(source, target, args.slug)
     except GraphQLClientHttpError as exc:
         # SDK's __str__ only includes the status code. Print the body too.
