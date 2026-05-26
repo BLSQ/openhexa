@@ -357,11 +357,6 @@ def _upload_versions(
     scheduled_src_number = scheduled_src.get("versionNumber")
 
     if is_notebook:
-        result.warnings.append(
-            f"pipeline '{target_code}' is a notebook pipeline; its source file "
-            f"at notebookPath='{detail.get('notebookPath')}' must be "
-            "copied into the local workspace files for it to run."
-        )
         if detail.get("versions"):
             result.warnings.append(
                 f"pipeline '{target_code}' has {len(detail['versions'])} version(s) "
