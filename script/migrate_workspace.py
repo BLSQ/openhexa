@@ -79,9 +79,12 @@ def _print_summary(
     print(f"Workspace: {src_ws_name!r} -> slug '{target_slug}'")
     total_bytes = sum(b for _, b in files_result.copied)
     print(f"Files copied: {len(files_result.copied)} ({total_bytes} bytes)")
-    if files_result.skipped:
-        print(f"Files skipped: {len(files_result.skipped)}")
-        for path in files_result.skipped:
+    if files_result.failed:
+        print(
+            f"Files that could NOT be migrated "
+            f"({len(files_result.failed)} — handle manually):"
+        )
+        for path in files_result.failed:
             print(f"  * {path}")
     print(f"Pipelines created: {len(pipelines_result.created)}")
     for code, vnames in pipelines_result.created:
@@ -92,10 +95,9 @@ def _print_summary(
         print(f"Pipelines skipped (already existed): {len(pipelines_result.skipped)}")
         for code in pipelines_result.skipped:
             print(f"  * {code}")
-    all_warnings = files_result.warnings + pipelines_result.warnings
-    if all_warnings:
+    if pipelines_result.warnings:
         print("Warnings:")
-        for w in all_warnings:
+        for w in pipelines_result.warnings:
             print(f"  - {w}")
     print(
         "Note: connections were not migrated; recreate them locally if "

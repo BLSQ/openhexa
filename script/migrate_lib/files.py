@@ -1,5 +1,6 @@
 """Workspace file transfer: list / download / upload, plus full bucket migration."""
 
+import sys
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -52,10 +53,8 @@ class FilesResult:
     copied: list[tuple[str, int]] = field(default_factory=list)
     """(object_key, byte_size) for each file copied to target."""
 
-    skipped: list[str] = field(default_factory=list)
-    """Object keys that could not be copied."""
-
-    warnings: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
+    """Object keys whose download or upload failed; user must handle manually."""
 
 
 def download(source: Client, ws_slug: str, file_path: str) -> bytes:
@@ -181,7 +180,10 @@ def migrate_all(
             content = download(source, source_slug, path)
             upload(target, target_slug, path, content)
             result.copied.append((path, len(content)))
-        except GraphQLError as exc:
-            result.warnings.append(f"could not copy '{path}': {exc}")
-            result.skipped.append(path)
+        except GraphQLError:
+            # Surface the failure in the live log without dumping the (often
+            # HTML) server response. The full path goes into result.failed for
+            # the final summary so the user can re-attempt manually.
+            print(f"\tFAILED to copy '{path}'", file=sys.stderr)
+            result.failed.append(path)
     return result
