@@ -42,7 +42,9 @@ DEFAULT_SOURCE_URL = "https://api.openhexa.org/graphql/"
 DEFAULT_TARGET_URL = "http://localhost:8000/graphql/"
 
 
-def migrate(source, target, source_slug: str) -> None:
+def migrate(
+    source, target, source_slug: str, target_organization_id: str | None = None
+) -> None:
     print(f"=> Fetching source workspace '{source_slug}' ...")
     src_ws = source.workspace(slug=source_slug)
     if src_ws is None:
@@ -50,7 +52,7 @@ def migrate(source, target, source_slug: str) -> None:
     print(f"   name: {src_ws.name!r}")
 
     print("=> Creating target workspace ...")
-    target_slug = workspaces.create(target, src_ws)
+    target_slug = workspaces.create(target, src_ws, target_organization_id)
     print(f"   created with slug '{target_slug}'")
     if target_slug != source_slug:
         print(
@@ -129,6 +131,13 @@ def main() -> int:
         help="Password of the Django superuser on the target server.",
     )
     parser.add_argument(
+        "--target-organization",
+        default=None,
+        help="Optional UUID of the organization on the target server to create "
+        "the workspace under. If omitted, the workspace is created without an "
+        "organization.",
+    )
+    parser.add_argument(
         "--debug",
         "-v",
         action="store_true",
@@ -148,7 +157,7 @@ def main() -> int:
         target = build_client(
             args.target_url, args.target_email, args.target_password, label="target"
         )
-        migrate(source, target, args.slug)
+        migrate(source, target, args.slug, args.target_organization)
     except GraphQLClientHttpError as exc:
         # SDK's __str__ only includes the status code. Print the body too.
         sys.stderr.write(

@@ -13,7 +13,7 @@ from openhexa.graphql.graphql_client.input_types import (
 from .transport import GraphQLError
 
 
-def create(target: Client, src_ws: Any) -> str:
+def create(target: Client, src_ws: Any, organization_id: str | None = None) -> str:
     """Create the workspace on target, returning the slug the server picked.
 
     Note: the server (see resolve_create_workspace + create_workspace_slug
@@ -32,6 +32,7 @@ def create(target: Client, src_ws: Any) -> str:
             countries=countries,
             load_sample_data=False,
             configuration=src_ws.configuration or {},
+            organization_id=organization_id,
         )
     )
     if not result.success or result.workspace is None:
