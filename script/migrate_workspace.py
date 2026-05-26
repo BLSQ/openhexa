@@ -7,15 +7,16 @@ CLI flags, exchanged for a session cookie via the GraphQL ``login`` mutation.
 Scope:
   - Workspace metadata (name, description, dockerImage, configuration,
     countries) is migrated.
+  - All files in the workspace bucket are copied from source to target
+    (must run before pipelines, since notebook pipelines require their
+    .ipynb to exist on the target before createPipeline succeeds).
   - Each pipeline is created via createPipeline; each zipfile-pipeline
     version is uploaded via uploadPipeline; pipeline-level schedule /
     config / webhookEnabled / scheduledPipelineVersionId are applied via
     updatePipeline.
 
 Out of scope: members, invitations, connections, recipients, templates,
-runs, shortcuts, workspace files, datasets, database tables. Notebook
-pipelines are created with their notebookPath but the notebook file
-itself is not migrated (a warning is emitted).
+runs, shortcuts, datasets, database tables.
 """
 
 import argparse
@@ -33,7 +34,8 @@ except ImportError:
     )
     sys.exit(1)
 
-from migrate_lib import pipelines, transport, workspaces
+from migrate_lib import files, pipelines, transport, workspaces
+from migrate_lib.files import FilesResult
 from migrate_lib.pipelines import PipelinesResult
 from migrate_lib.transport import GraphQLError, build_client
 
@@ -61,16 +63,26 @@ def migrate(
             "mutation always derives the slug from the workspace name."
         )
 
+    files_result = files.migrate_all(source, target, source_slug, target_slug)
     pipelines_result = pipelines.migrate_all(source, target, source_slug, target_slug)
 
-    _print_summary(src_ws.name, target_slug, pipelines_result)
+    _print_summary(src_ws.name, target_slug, files_result, pipelines_result)
 
 
 def _print_summary(
-    src_ws_name: str, target_slug: str, pipelines_result: PipelinesResult
+    src_ws_name: str,
+    target_slug: str,
+    files_result: FilesResult,
+    pipelines_result: PipelinesResult,
 ) -> None:
     print("\n=== Migration summary ===")
     print(f"Workspace: {src_ws_name!r} -> slug '{target_slug}'")
+    total_bytes = sum(b for _, b in files_result.copied)
+    print(f"Files copied: {len(files_result.copied)} ({total_bytes} bytes)")
+    if files_result.skipped:
+        print(f"Files skipped: {len(files_result.skipped)}")
+        for path in files_result.skipped:
+            print(f"  * {path}")
     print(f"Pipelines created: {len(pipelines_result.created)}")
     for code, vnames in pipelines_result.created:
         print(f"  * {code}")
@@ -80,9 +92,10 @@ def _print_summary(
         print(f"Pipelines skipped (already existed): {len(pipelines_result.skipped)}")
         for code in pipelines_result.skipped:
             print(f"  * {code}")
-    if pipelines_result.warnings:
+    all_warnings = files_result.warnings + pipelines_result.warnings
+    if all_warnings:
         print("Warnings:")
-        for w in pipelines_result.warnings:
+        for w in all_warnings:
             print(f"  - {w}")
     print(
         "Note: connections were not migrated; recreate them locally if "

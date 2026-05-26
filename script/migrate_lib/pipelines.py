@@ -7,7 +7,6 @@ from typing import Any
 from openhexa.graphql.graphql_client.client import Client
 from openhexa.graphql.graphql_client.input_types import CreatePipelineInput
 
-from . import files
 from .transport import GraphQLError, gql
 
 
@@ -271,9 +270,11 @@ def migrate_all(
         detail = _fetch_source_detail(source, pipeline_id)
         is_notebook = detail.get("type") == "notebook"
 
-        if is_notebook and not _copy_notebook_file(
-            source, target, source_slug, target_slug, src_code, detail, result
-        ):
+        if is_notebook and not detail.get("notebookPath"):
+            result.warnings.append(
+                f"notebook pipeline '{src_code}' has no notebookPath; skipped."
+            )
+            result.skipped.append(src_code)
             continue
 
         target_pid, target_code = _create_on_target(target, target_slug, detail)
@@ -293,53 +294,6 @@ def migrate_all(
         result.created.append((target_code, uploaded_names))
 
     return result
-
-
-def _copy_notebook_file(
-    source: Client,
-    target: Client,
-    source_slug: str,
-    target_slug: str,
-    src_code: str,
-    detail: dict[str, Any],
-    result: PipelinesResult,
-) -> bool:
-    """Copy a notebook pipeline's .ipynb from source to target bucket.
-
-    Returns True on success (caller proceeds to create the pipeline), False
-    if the notebook is missing or transfer failed (caller skips the pipeline).
-
-    createPipeline for notebook pipelines requires the notebook file to
-    already exist in the workspace bucket (openhexa-app
-    pipelines/schema/mutations.py:82) — hence this happens before the
-    createPipeline call.
-    """
-    nbpath = detail.get("notebookPath")
-    if not nbpath:
-        result.warnings.append(
-            f"notebook pipeline '{src_code}' has no notebookPath; skipped."
-        )
-        result.skipped.append(src_code)
-        return False
-    try:
-        print(f"       fetching notebook '{nbpath}' from source ...")
-        nb_bytes = files.download(source, source_slug, nbpath)
-        print(f"       uploading notebook to target ({len(nb_bytes)} bytes) ...")
-        files.upload(
-            target,
-            target_slug,
-            nbpath,
-            nb_bytes,
-            content_type="application/x-ipynb+json",
-        )
-    except GraphQLError as exc:
-        result.warnings.append(
-            f"notebook pipeline '{src_code}': could not migrate notebook file "
-            f"'{nbpath}' ({exc}); pipeline skipped."
-        )
-        result.skipped.append(src_code)
-        return False
-    return True
 
 
 def _upload_versions(
