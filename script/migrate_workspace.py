@@ -10,13 +10,17 @@ Scope:
   - All files in the workspace bucket are copied from source to target
     (must run before pipelines, since notebook pipelines require their
     .ipynb to exist on the target before createPipeline succeeds).
+  - Connections (including secret field values) are recreated via
+    createConnection. Secret values come through only because we
+    authenticate as a superuser; any that come back empty are created
+    empty and flagged in the summary for manual entry.
   - Each pipeline is created via createPipeline; each zipfile-pipeline
     version is uploaded via uploadPipeline; pipeline-level schedule /
     config / webhookEnabled / scheduledPipelineVersionId are applied via
     updatePipeline.
 
-Out of scope: members, invitations, connections, recipients, templates,
-runs, shortcuts, datasets, database tables.
+Out of scope: members, invitations, recipients, templates, runs,
+shortcuts, datasets, database tables.
 """
 
 import argparse
@@ -34,7 +38,8 @@ except ImportError:
     )
     sys.exit(1)
 
-from migrate_lib import files, pipelines, transport, workspaces
+from migrate_lib import connections, files, pipelines, transport, workspaces
+from migrate_lib.connections import ConnectionsResult
 from migrate_lib.files import FilesResult
 from migrate_lib.pipelines import PipelinesResult
 from migrate_lib.transport import GraphQLError, build_client
@@ -64,15 +69,21 @@ def migrate(
         )
 
     files_result = files.migrate_all(source, target, source_slug, target_slug)
+    connections_result = connections.migrate_all(
+        source, target, source_slug, target_slug
+    )
     pipelines_result = pipelines.migrate_all(source, target, source_slug, target_slug)
 
-    _print_summary(src_ws.name, target_slug, files_result, pipelines_result)
+    _print_summary(
+        src_ws.name, target_slug, files_result, connections_result, pipelines_result
+    )
 
 
 def _print_summary(
     src_ws_name: str,
     target_slug: str,
     files_result: FilesResult,
+    connections_result: ConnectionsResult,
     pipelines_result: PipelinesResult,
 ) -> None:
     print("\n=== Migration summary ===")
@@ -86,6 +97,26 @@ def _print_summary(
         )
         for path in files_result.failed:
             print(f"  * {path}")
+    print(f"Connections created: {len(connections_result.created)}")
+    for slug, n_fields in connections_result.created:
+        print(f"  * {slug} ({n_fields} field(s))")
+    if connections_result.skipped:
+        print(
+            f"Connections skipped (already existed): {len(connections_result.skipped)}"
+        )
+        for slug in connections_result.skipped:
+            print(f"  * {slug}")
+    if connections_result.failed:
+        print(
+            f"Connections that could NOT be migrated "
+            f"({len(connections_result.failed)} — handle manually):"
+        )
+        for slug in connections_result.failed:
+            print(f"  * {slug}")
+    if connections_result.warnings:
+        print("Connection warnings:")
+        for w in connections_result.warnings:
+            print(f"  - {w}")
     print(f"Pipelines created: {len(pipelines_result.created)}")
     for code, vnames in pipelines_result.created:
         print(f"  * {code}")
@@ -99,10 +130,6 @@ def _print_summary(
         print("Warnings:")
         for w in pipelines_result.warnings:
             print(f"  - {w}")
-    print(
-        "Note: connections were not migrated; recreate them locally if "
-        "any pipeline depends on connection-typed parameters."
-    )
 
 
 def main() -> int:
