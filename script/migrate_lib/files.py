@@ -2,7 +2,6 @@
 
 import httpx
 from openhexa.graphql.graphql_client.client import Client
-from openhexa.sdk.utils import OpenHexaClient
 
 from .transport import GraphQLError, _dbg, gql
 
@@ -24,7 +23,7 @@ mutation PrepareUpload($input: PrepareObjectUploadInput!) {
 """
 
 
-def download(source: OpenHexaClient, ws_slug: str, file_path: str) -> bytes:
+def download(source: Client, ws_slug: str, file_path: str) -> bytes:
     """Download a file from the source workspace via a presigned URL."""
     data = gql(
         source,

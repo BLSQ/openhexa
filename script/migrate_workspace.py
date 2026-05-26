@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Migrate a workspace from one OpenHEXA server to another.
 
-Source auth: WorkspaceMembership.access_token (the same token format the
-OpenHEXA CLI uses), sent as ``Authorization: Bearer <token>``.
-
-Target auth: Django superuser email/password passed via CLI flags,
-exchanged for a session cookie via the GraphQL ``login`` mutation.
+Auth (both source and target): Django superuser email/password passed via
+CLI flags, exchanged for a session cookie via the GraphQL ``login`` mutation.
 
 Scope:
   - Workspace metadata (name, description, dockerImage, configuration,
@@ -38,7 +35,7 @@ except ImportError:
 
 from migrate_lib import pipelines, transport, workspaces
 from migrate_lib.pipelines import PipelinesResult
-from migrate_lib.transport import GraphQLError, build_source, build_target
+from migrate_lib.transport import GraphQLError, build_client
 
 
 DEFAULT_SOURCE_URL = "https://api.openhexa.org/graphql/"
@@ -97,12 +94,6 @@ def main() -> int:
         "to the local Docker setup.",
     )
     parser.add_argument(
-        "--token",
-        required=True,
-        help="WorkspaceMembership access token from the source server "
-        "(same token used by the OpenHEXA CLI).",
-    )
-    parser.add_argument(
         "--slug",
         required=True,
         help="Slug of the source workspace on the remote server.",
@@ -111,6 +102,16 @@ def main() -> int:
         "--source-url",
         default=DEFAULT_SOURCE_URL,
         help=f"Source GraphQL endpoint (default: {DEFAULT_SOURCE_URL}).",
+    )
+    parser.add_argument(
+        "--source-email",
+        required=True,
+        help="Email of the Django superuser on the source server.",
+    )
+    parser.add_argument(
+        "--source-password",
+        required=True,
+        help="Password of the Django superuser on the source server.",
     )
     parser.add_argument(
         "--target-url",
@@ -141,8 +142,12 @@ def main() -> int:
     print(f"Target: {args.target_url}")
 
     try:
-        source = build_source(args.source_url, args.token)
-        target = build_target(args.target_url, args.target_email, args.target_password)
+        source = build_client(
+            args.source_url, args.source_email, args.source_password, label="source"
+        )
+        target = build_client(
+            args.target_url, args.target_email, args.target_password, label="target"
+        )
         migrate(source, target, args.slug)
     except GraphQLClientHttpError as exc:
         # SDK's __str__ only includes the status code. Print the body too.

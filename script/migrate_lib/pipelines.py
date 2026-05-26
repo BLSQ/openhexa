@@ -6,7 +6,6 @@ from typing import Any
 
 from openhexa.graphql.graphql_client.client import Client
 from openhexa.graphql.graphql_client.input_types import CreatePipelineInput
-from openhexa.sdk.utils import OpenHexaClient
 
 from . import files
 from .transport import GraphQLError, gql
@@ -77,7 +76,7 @@ class PipelinesResult:
 # ---------------------------------------------------------------------------
 
 
-def _list_source_ids(source: OpenHexaClient, slug: str) -> list[tuple[str, str]]:
+def _list_source_ids(source: Client, slug: str) -> list[tuple[str, str]]:
     """Return [(pipeline_id, pipeline_code), ...] across all pages."""
     pairs: list[tuple[str, str]] = []
     page = 1
@@ -92,7 +91,7 @@ def _list_source_ids(source: OpenHexaClient, slug: str) -> list[tuple[str, str]]
     return pairs
 
 
-def _fetch_source_detail(source: OpenHexaClient, pipeline_id: str) -> dict[str, Any]:
+def _fetch_source_detail(source: Client, pipeline_id: str) -> dict[str, Any]:
     """Fetch full pipeline data + all versions for one pipeline."""
     first = gql(
         source,
@@ -249,7 +248,7 @@ def _update_settings(
 
 
 def migrate_all(
-    source: OpenHexaClient,
+    source: Client,
     target: Client,
     source_slug: str,
     target_slug: str,
@@ -297,7 +296,7 @@ def migrate_all(
 
 
 def _copy_notebook_file(
-    source: OpenHexaClient,
+    source: Client,
     target: Client,
     source_slug: str,
     target_slug: str,

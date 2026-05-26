@@ -5,7 +5,6 @@ from typing import Any
 
 import httpx
 from openhexa.graphql.graphql_client.client import Client
-from openhexa.sdk.utils import OpenHexaClient
 
 
 # Toggled by the CLI's --debug / -v. Module-global so the gql() wrapper and the
@@ -58,22 +57,22 @@ def gql(
     return client.get_data(resp)
 
 
-def build_source(server_url: str, token: str) -> OpenHexaClient:
-    return OpenHexaClient(token=token, server_url=server_url)
+def build_client(server_url: str, email: str, password: str, *, label: str) -> Client:
+    """Authenticate against an OpenHEXA server via the GraphQL Login mutation.
 
-
-def build_target(target_url: str, email: str, password: str) -> Client:
+    `label` is used only to make the error message ("source"/"target") clearer.
+    """
     http = httpx.Client(headers={"User-Agent": "openhexa-migrate/1.0"})
     # Prime CSRF cookie. Defensive — GraphQLView is csrf_exempt on the
     # current backend, but a future change would otherwise silently
     # break every mutation.
-    http.get(target_url)
+    http.get(server_url)
     csrf = http.cookies.get("csrftoken")
     if csrf:
         http.headers["X-CSRFToken"] = csrf
-        http.headers["Referer"] = target_url
+        http.headers["Referer"] = server_url
 
-    client = Client(url=target_url, http_client=http)
+    client = Client(url=server_url, http_client=http)
     data = gql(
         client,
         "mutation Login($input: LoginInput!) { login(input: $input) { success errors } }",
@@ -82,6 +81,6 @@ def build_target(target_url: str, email: str, password: str) -> Client:
     )
     if not data["login"]["success"]:
         raise GraphQLError(
-            "target login failed: " + ",".join(data["login"]["errors"] or [])
+            f"{label} login failed: " + ",".join(data["login"]["errors"] or [])
         )
     return client
