@@ -323,7 +323,8 @@ def _migrate_one(
     # 5. Warn on validated-on-source.
     if src_template.get("validatedAt"):
         result.warnings.append(
-            f"template '{name}' is validated on source; target stays community "
+            f"template '{name}' is an official Bluesquare template on source; "
+            "on target it will appear as a community template "
             "(validatedAt is not settable via the API)."
         )
 
