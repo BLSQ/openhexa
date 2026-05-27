@@ -20,12 +20,16 @@ def _dbg(msg: str) -> None:
 def _short(value: Any, limit: int = 200) -> str:
     """Render a value for debug output without dumping huge zipfiles."""
     if isinstance(value, dict):
-        return "{" + ", ".join(f"{k}={_short(v, limit)}" for k, v in value.items()) + "}"
+        return (
+            "{" + ", ".join(f"{k}={_short(v, limit)}" for k, v in value.items()) + "}"
+        )
     if isinstance(value, list):
         head = ", ".join(_short(v, limit) for v in value[:3])
         return f"[{head}{', ...' if len(value) > 3 else ''}] (n={len(value)})"
     s = repr(value)
-    return s if len(s) <= limit else s[:limit] + f"... <truncated {len(s) - limit} chars>"
+    return (
+        s if len(s) <= limit else s[:limit] + f"... <truncated {len(s) - limit} chars>"
+    )
 
 
 class GraphQLError(RuntimeError):
@@ -62,7 +66,13 @@ def build_client(server_url: str, email: str, password: str, *, label: str) -> C
 
     `label` is used only to make the error message ("source"/"target") clearer.
     """
-    http = httpx.Client(headers={"User-Agent": "openhexa-migrate/1.0"})
+    # 120s read timeout: createPipelineTemplateVersion can fan out to
+    # auto-update every pipeline derived from the template, which is slow
+    # on prod and exceeds httpx's 5s default.
+    http = httpx.Client(
+        headers={"User-Agent": "openhexa-migrate/1.0"},
+        timeout=httpx.Timeout(120.0),
+    )
     # Prime CSRF cookie. Defensive — GraphQLView is csrf_exempt on the
     # current backend, but a future change would otherwise silently
     # break every mutation.
