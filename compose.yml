@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:4.6.0"
+    image: "blsq/openhexa-app:5.6.2"
     platform: linux/amd64
     networks:
       - openhexa
@@ -35,15 +35,22 @@ x-app: &common
       # Storage backend for workspace files
       STORAGE_BACKEND: ${STORAGE_BACKEND:-fs}
       # To control what hostname can access the backend
-      ADDITIONAL_ALLOWED_HOSTS: "app,frontend"
+      ADDITIONAL_ALLOWED_HOSTS: "app,frontend,${ADDITIONAL_ALLOWED_HOSTS:-}"
+      # Forgejo Git server URL (reachable on the local Docker network)
+      GIT_SERVER_URL: http://forgejo:3000
+      # Optional: parent domain for serving static webapps from a subdomain.
+      # Requires wildcard DNS pointing at this host. Leave empty to disable.
+      WEBAPPS_DOMAIN: ${WEBAPPS_DOMAIN:-}
 services:
   app:
     <<: *common
-    command: "manage runserver 0:8000"
+    command: "start"
     restart: unless-stopped
     container_name: app
     ports:
       - "${APP_PORT:-8000}:8000"
+    depends_on:
+      - forgejo
     healthcheck:
       test: curl "http://app:8000/ready" || exit 1
       interval: "60s"
@@ -52,7 +59,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:4.6.0"
+    image: "blsq/openhexa-frontend:5.6.2"
     platform: linux/amd64
     networks:
       - openhexa
@@ -169,6 +176,43 @@ services:
       interval: "60s"
       timeout: "3s"
       start_period: "5s"
+      retries: 3
+
+  # Forgejo provides the Git server backing OpenHEXA static webapps.
+  # The `app` service requires it to be reachable at http://forgejo:3000.
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:14.0.5
+    platform: linux/amd64
+    container_name: forgejo
+    networks:
+      - openhexa
+    entrypoint: /custom-entrypoint.sh
+    environment:
+      # Align Forgejo's internal `git` user with the host owner of
+      # FORGEJO_STORAGE_LOCATION, mirroring how the `app` service runs.
+      # Note: we can't set the container user directly since Forgejo
+      # (and custom-entrypoint.sh) must start as root.
+      USER_UID: ${OH_UID:-1000}
+      USER_GID: ${OH_GID:-1000}
+      GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
+      GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
+      FORGEJO__database__DB_TYPE: sqlite3
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__server__ROOT_URL: "http://localhost:${FORGEJO_PORT:-3100}/"
+      FORGEJO__server__LANDING_PAGE: explore
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+    volumes:
+      - "${FORGEJO_STORAGE_LOCATION}:/data"
+      - ${FORGEJO_ENTRYPOINT_PATH:-./forgejo/entrypoint.sh}:/custom-entrypoint.sh:ro
+    ports:
+      - "${FORGEJO_PORT:-3100}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: curl -fs "http://localhost:3000/api/healthz" || exit 1
+      interval: "60s"
+      timeout: "3s"
+      start_period: "10s"
       retries: 3
 
 networks:

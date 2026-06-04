@@ -140,7 +140,11 @@ jobs:
         run: docker build -t openhexa/smoke-tests .
 
       - name: Run smoke tests
-        run: docker run -t --net=host -v "$(pwd)/test-results:/code/test-results" openhexa/smoke-tests http://localhost:3000/ root@openhexa.org root
+        run: |
+          SUPERUSER_PASSWORD=$(sudo grep -E '^DJANGO_SUPERUSER_PASSWORD=' /etc/openhexa/env.conf | cut -d= -f2-)
+          docker run -t --net=host \
+            -v "$(pwd)/test-results:/code/test-results" \
+            openhexa/smoke-tests http://localhost:3000/ root@openhexa.org "$SUPERUSER_PASSWORD"
 
       - name: Keep test results
         uses: actions/upload-artifact@v7

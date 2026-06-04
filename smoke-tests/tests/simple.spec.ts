@@ -18,9 +18,8 @@ test.describe("it can view a workspace's common pages", () => {
   test("view workspace's tables", async ({ workspacePage }) => {
     await workspacePage
       .getByRole("navigation")
-      .getByRole("link")
-      .nth(2)
-      .click(); // Tables link
+      .getByRole("link", { name: "Database" })
+      .click();
     await expect(
       workspacePage.getByRole("heading", { name: "Tables" }),
     ).toBeVisible();
@@ -32,9 +31,8 @@ test.describe("it can view a workspace's common pages", () => {
   test("view workspace's files", async ({ workspacePage }) => {
     await workspacePage
       .getByRole("navigation")
-      .getByRole("link")
-      .nth(1)
-      .click(); // Files link
+      .getByRole("link", { name: "Files" })
+      .click();
     await expect(
       workspacePage.getByRole("columnheader", { name: "Size" }).first(),
     ).toBeVisible();
@@ -46,9 +44,8 @@ test.describe("it can view a workspace's common pages", () => {
   test("view workspace's jupyterlab environment", async ({ workspacePage }) => {
     await workspacePage
       .getByRole("navigation")
-      .getByRole("link")
-      .nth(6)
-      .click(); // Jupyterlab link
+      .getByRole("link", { name: "JupyterHub" })
+      .click();
     await expect(
       await workspacePage
         .frameLocator("iframe")

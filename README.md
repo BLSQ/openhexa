@@ -7,8 +7,7 @@
 
 [![build_debian_package](https://github.com/BLSQ/openhexa/actions/workflows/build_debian_package.yml/badge.svg)](https://github.com/BLSQ/openhexa/actions/workflows/build_debian_package.yml)
 
-OpenHEXA
-========
+# OpenHEXA
 
 OpenHEXA is an open-source data integration and data analysis platform developed by [Bluesquare](https://bluesquarehub.com).
 
@@ -27,8 +26,7 @@ OpenHEXA allows you to:
 
 Please note that this repository **does not contain any code**: it is a starting point for OpenHEXA users and implementers. Please refer to the [technical architecture](https://github.com/BLSQ/openhexa/wiki/Technical-architecture) page of our wiki for more information about the different OpenHEXA components, including the links to the relevant GitHub repositories.
 
-Documentation
--------------
+## Documentation
 
 The OpenHEXA documentation lives in our [wiki](https://github.com/BLSQ/openhexa/wiki).
 
@@ -37,20 +35,20 @@ To get started, you might be interested in the following pages:
 - [User manual](https://github.com/BLSQ/openhexa/wiki/User-manual)
 - [Installation instructions](https://github.com/BLSQ/openhexa/wiki/Installation-instructions)
 
-Roadmap, issues and discussions
--------------------------------
+## Roadmap, issues and discussions
 
 Feel free to reach out in the [discussions section](https://github.com/BLSQ/openhexa/discussions) if you have
 questions or suggestions!
 
-Quick Start
------------
+## Quick Start
 
 Requirements:
+
 - a least [Docker 26.1](https://docs.docker.com/engine/install/debian/#install-using-the-repository)
 - Debian bookworm
-- Debian packages `gettext-base`, `postgresql` (14+), `postgresql-<postgresql version>-postgis-3`, `duplicity` (optional to manage backup and restore)
+- Debian packages `gettext-base`, `postgresql` (16+), `postgresql-<postgresql version>-postgis-3`, `duplicity` (optional to manage backup and restore)
 - [yq](https://github.com/mikefarah/yq/#install)
+- Host port `3100` available for the bundled Forgejo Git server (override with `FORGEJO_PORT`)
 
 After having cloned this repo and change your current dir to it, you can check
 your installation by running first
@@ -79,7 +77,7 @@ Then you can prepare the database and environment with
 ```
 
 > [!IMPORTANT]
-> The `prepare` command will create an initial superuser for your installation. If you are setting up a real server, make sure you **choose a secure password**.
+> The `prepare` command will create an initial superuser using the credentials in `.env` (`DJANGO_SUPERUSER_USERNAME` / `DJANGO_SUPERUSER_PASSWORD`). On a fresh install, `setup.sh` auto-generates a random `DJANGO_SUPERUSER_PASSWORD`. Check `.env` to retrieve it for the first login, or edit it before running `prepare` if you want to set your own.
 
 Finally, you can run openhexa with
 
@@ -97,7 +95,7 @@ If you need to purge the configuration and the database after having stopped it,
 you can do it by executing the following command
 
 ```bash
-./script/openhexa.sh purge
+./script/setup.sh purge
 ```
 
 Once installed, it could be interesting to make sure you have the last version.
@@ -130,10 +128,9 @@ docker run -it -v $(pwd):/work openhexa-build
 
 You can then follow the instructions below to build the package as usual.
 
-
 #### Release, changelog, and versions
 
-The versions are described into  the [changelog file](debian/changelog). The last
+The versions are described into the [changelog file](debian/changelog). The last
 one is unreleased and is the one that is published. To manage versions and
 changelog, we use the debhelper tool `dch`.
 
@@ -177,10 +174,14 @@ The resulting package is available in the parent directory:
 #### Install
 
 Requirements:
+
 - a least [Docker 26.1](https://docs.docker.com/engine/install/debian/#install-using-the-repository)
 - Debian bookworm
 - Systemd
 - [yq](https://github.com/mikefarah/yq/#install)
+- PostgreSQL 16+ (required by OpenHEXA 4.1.0+)
+- Host port `3100` free for the bundled Forgejo Git server (override with
+  `FORGEJO_PORT` in `/etc/openhexa/env.conf`)
 
 First of all, you need to add our APT repository and GPG public key:
 
@@ -211,7 +212,6 @@ sudo apt install openhexa
 
 If you want to manage backup and retore through our script, you can install it
 with recommended packages `sudo apt install --install-recommends openhexa`.
-
 
 If you have Systemd, OpenHexa is run as a Systemd service `openhexa` (that you
 can then manage with `systemctl`). If you don't use Systemd, you can still run
@@ -269,34 +269,97 @@ During the setup, the following is done on the PostgreSQL side:
 
 ##### Backup
 
-You can manage your backup and restore directly with OpenHexa. It will backup
-all the workspaces data, and all databases. This relies on the tool `duplicity`.
-Make sure that it is installed if you haven't installed it yet (if you install
-OpenHexa with `apt`, do it with the recommended packages).
+You can manage your backup and restore directly with OpenHexa. It backs up:
+
+- a `pg_dumpall` of the PostgreSQL cluster (covers the `hexa-app` and
+- the workspace files at `WORKSPACE_STORAGE_LOCATION`,
+  `hexa-hub` databases),
+- the Forgejo data directory at `FORGEJO_STORAGE_LOCATION` (git repositories
+  for static webapps plus Forgejo's SQLite metadata database),
+- a snapshot of `.env` (so the encryption keys needed to read the restored
+  database are kept alongside the data).
+
+This relies on the tool `duplicity`. Make sure that it is installed if you
+haven't installed it yet (if you install OpenHexa with `apt`, do it with the
+recommended packages).
 
 First, you need to set it up:
 
 ```bash
-/usr/share/openhexa/setup.sh backup /mylocaldirecotry/where/to/do/thebackup/ encryption_passkey
+/usr/share/openhexa/setup.sh backup file:///mylocaldirectory/where/to/do/thebackup/ encryption_passkey
 ```
 
-Then you can back up the data with:
-
-```bash
-/usr/share/openhexa/openhexa.sh backup
-```
+The target directory will contain two duplicity backends side by side:
+`<LOCATION>/workspaces` and `<LOCATION>/forgejo`.
 
 Depending on the user activities, it might be a good idea to stop the service or
 simply redirect the website to a maintenance HTML page.
 
-To restore the data, you execute the following:
+Once configured, the following commands are available:
+
+| Command | Description |
+| --- | --- |
+| `/usr/share/openhexa/openhexa.sh backup` | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot. |
+| `/usr/share/openhexa/openhexa.sh backup-status` | Show the duplicity `collection-status` for both the `workspaces` and `forgejo` backends. |
+| `/usr/share/openhexa/openhexa.sh restore` | Restore the latest backup. This requires stopping the services before a full restore. |
+
+After a restore, an `openhexa-env.bak` file is left next to the workspace data:
+compare it with the live `.env` to make sure `ENCRYPTION_KEY`, `SECRET_KEY` and
+the JupyterHub/Forgejo secrets match the restored database.
+
+###### Restoring onto a populated PostgreSQL cluster
+
+`restore` replays a `pg_dumpall` produced without `--clean`, so it expects an empty target cluster (e.g. a fresh install). If the application databases or roles already exist, the `CREATE DATABASE` / `CREATE ROLE` statements will fail, leaving the live data effectively untouched.
+
+To restore on top of an existing setup, drop the application objects manually before running `restore`. Stop the services first so nothing holds open
+connections:
 
 ```bash
-/usr/share/openhexa/openhexa.sh backup
+# 1. Stop everything that talks to PostgreSQL.
+/usr/share/openhexa/openhexa.sh stop
+
+# 2. Drop the OpenHexa databases and roles as the postgres superuser. Replace
+#    the database/role names below with whatever your `.env` defines (typically
+#    DATABASE_NAME, JUPYTERHUB_DATABASE_NAME, plus any per-workspace databases
+#    matching `[a-z0-9]{16}` that you can list with `\l` in psql).
+sudo -u postgres psql -p "$DATABASE_PORT" <<'SQL'
+DROP DATABASE IF EXISTS "hexa-app";
+DROP DATABASE IF EXISTS "hexa-hub";
+-- repeat DROP DATABASE for every workspace database
+DROP ROLE IF EXISTS "hexa-app";
+DROP ROLE IF EXISTS "hexa-hub";
+-- repeat DROP ROLE for every workspace role
+SQL
+
+# 3. Now run the restore.
+/usr/share/openhexa/openhexa.sh restore
 ```
 
-In this case, we advise you to stop the service before performing a full
-restore.
+###### Restoring a pre-Forgejo backup (legacy layout)
+
+Backups taken before the Forgejo upgrade used a single duplicity backend at
+`<LOCATION>` (no `workspaces` / `forgejo` sub-prefix) and did not include a
+Forgejo data directory or an `.env` snapshot. `openhexa.sh restore` won't
+recover them as-is — it expects both new sub-prefixes to exist. Restore them
+by hand with `duplicity`:
+
+```bash
+# Stop the services first
+sudo systemctl stop openhexa
+
+# Restore the workspace tree (includes the legacy openhexa-dumpall.sql)
+sudo -u openhexa PASSPHRASE='your-passphrase' duplicity restore \
+    file:///path/to/old/backup/ \
+    /var/lib/openhexa/workspaces
+
+# Load the PostgreSQL dump
+sudo -u postgres psql -f /var/lib/openhexa/workspaces/openhexa-dumpall.sql template1
+
+# Forgejo had no data in the legacy layout: leave FORGEJO_STORAGE_LOCATION
+# empty and let `openhexa.sh prepare` bootstrap a fresh Forgejo on next start.
+sudo systemctl start openhexa
+/usr/share/openhexa/openhexa.sh prepare
+```
 
 #### Configuration properties
 
@@ -313,6 +376,7 @@ Finally, we need the port number where the local PostgreSQL cluster listens:
 ##### Email server
 
 In order to be able to send mails to users, you have to provide the configuration options:
+
 - `EMAIL_HOST`
 - `EMAIL_PORT`
 - `EMAIL_HOST_USER`
@@ -328,6 +392,65 @@ You can override it by setting this ENV variable to the local IP of the server:
 
 ```
 OVERRIDE_WORKSPACES_DATABASE_HOST="<LOCAL-IP>"
+```
+
+##### Forgejo Git server
+
+Since OpenHEXA 5.0.0, the Static Webapps feature is backed by a Forgejo Git
+server that runs as a sibling container. The package ships a `forgejo`
+service (image `codeberg.org/forgejo/forgejo:14`) and a custom entrypoint
+at `/usr/share/openhexa/forgejo/entrypoint.sh` that creates the admin user
+on first boot.
+
+The relevant configuration properties:
+
+- `GIT_SERVER_ADMIN_USERNAME` (default `openhexa-admin`)
+- `GIT_SERVER_ADMIN_PASSWORD`: auto-generated by `setup.sh` on first install
+- `FORGEJO_PORT` (default `3100`): host port mapped to the Forgejo UI
+
+The Django backend talks to Forgejo over the internal Docker network at
+`http://forgejo:3000`. This is set in `compose.yml` and does not require
+configuration. Forgejo's data lives in the named Docker volume
+`forgejo_data` and is preserved across `update`/`restart`.
+
+##### Static Webapps subdomain (optional)
+
+Set `WEBAPPS_DOMAIN=webapps.example.com` to serve each public webapp from
+its own subdomain (e.g. `app1.webapps.example.com`). This requires a
+wildcard DNS record pointing at this host. Leave the variable empty to keep
+webapps on the main backend host.
+
+For custom-domain webapps, list each domain in `ADDITIONAL_ALLOWED_HOSTS`
+_and_ attach it to the corresponding Webapp via the Django admin.
+
+#### Upgrading from 4.6.0
+
+The 5.x series introduces Forgejo as a hard dependency. To upgrade an
+existing 4.6.0 installation:
+
+```bash
+sudo systemctl stop openhexa
+sudo apt update && sudo apt install --only-upgrade openhexa
+# Pull the new app/frontend images and the Forgejo image:
+sudo /usr/share/openhexa/openhexa.sh -g update
+# Run migrations and bootstrap the Git server admin user:
+sudo /usr/share/openhexa/openhexa.sh -g prepare
+sudo systemctl start openhexa
+```
+
+The package post-install hook runs `update` and `prepare` automatically when
+installing for the first time, but on upgrades you should re-run them
+explicitly to apply Django migrations introduced between 4.6.0 and 5.6.2
+(custom webapp domains, AI agent tables, scheduled-run version selection,
+read-only table protection).
+
+The new `GIT_SERVER_ADMIN_PASSWORD` is generated only when `.env` does not
+yet exist. On an in-place upgrade, your existing `.env` will not contain
+this variable and you should add these env variables manually:
+
+```bash
+GIT_SERVER_ADMIN_USERNAME=openhexa-admin
+GIT_SERVER_ADMIN_PASSWORD=something-secure
 ```
 
 #### Test

@@ -33,8 +33,9 @@ function usage() {
     update      pulls last container images
     prepare     runs databases migrations and installs fixtures
     logs        gets all the logs
-    backup      backs up OpenHexa
-    restore     restores OpenHexa, more details with \`help restore\`
+    backup         backs up OpenHexa
+    backup-status  show duplicity collection-status for the workspaces and forgejo backends
+    restore        restores OpenHexa, more details with \`help restore\`
     help [cmd]  prints current usage documentation or of the given command \`cmd\`
     version     prints current version
     """
@@ -104,6 +105,15 @@ function is_backend_reachable() {
   (($(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready) == 200))
 }
 
+function is_forgejo_reachable() {
+  local port
+  port=$(
+    load_env 2>/dev/null
+    echo "${FORGEJO_PORT:-3100}"
+  )
+  (($(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}/api/healthz") == 200))
+}
+
 function is_db_accepting_connexion() {
   # TODO replace with get_config_or_default
   (
@@ -147,20 +157,50 @@ function duplicity_parameters_for_some_type() {
   *) ;;
   esac
 }
+function require_backup_config() {
+  local location passphrase
+  if [[ ! -r "$(backup_conf_file)" ]]; then
+    echo "Backup not configured: $(backup_conf_file) is missing."
+    echo "Run \`setup.sh backup <LOCATION> <PASSPHRASE>\` first."
+    return 1
+  fi
+  location=$(get_backup_config LOCATION)
+  passphrase=$(get_backup_config PASSPHRASE)
+  if [[ -z $location || -z $passphrase ]]; then
+    echo "Backup config $(backup_conf_file) is missing LOCATION or PASSPHRASE."
+    return 1
+  fi
+  return 0
+}
+
+function full_if_older_than_arg() {
+  local age=$1
+  [[ -n $age ]] && echo "--full-if-older-than ${age}"
+}
+
+function run_duplicity_backup() {
+  local source=$1 target=$2 type=$3 passphrase=$4 oldest_full_age=$5
+  # No action verb on purpose: duplicity picks `full` on first run and
+  # `incremental` thereafter, so the same command works on empty targets.
+  PASSPHRASE=$passphrase \
+    duplicity \
+    $(duplicity_parameters_for_some_type "${type}") \
+    $(full_if_older_than_arg "${oldest_full_age}") \
+    "${source}" \
+    "${target}"
+}
+
 function perform_backup() {
+  require_backup_config || return 1
   (
-    echo -n "Prepare dump of the whole PostgreSQL cluster dedicated to OpenHexa ... "
-    local dumpfile_path
     load_env
-    dumpfile_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-dumpall.sql"
-    pgpassfile=$(begin_pgsql_session localhost "${DATABASE_PORT}" "${DATABASE_USER}" "${DATABASE_PASSWORD}")
-    PGPASSFILE=$pgpassfile pg_dumpall --file "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}"
-    end_pgsql_session "${pgpassfile}"
-    echo "OK"
+    local dumpfile_path envcopy_path type location passphrase oldest_full_age pgpassfile rc=0
 
     echo -n "Load backup configuration ... "
-    local type
     type=$(get_backup_config TYPE)
+    location=$(get_backup_config LOCATION)
+    passphrase=$(get_backup_config PASSPHRASE)
+    oldest_full_age=$(get_backup_config OLDEST_FULL_BCK_AGE)
     # case $type in
     # s3)
     #   export AWS_ACCESS_KEY_ID=$(get_backup_config ACCESS_KEY_ID)
@@ -174,51 +214,132 @@ function perform_backup() {
     # esac
     echo "OK"
 
-    echo -n "Back up workspace files and PostgreSQL dump ... "
-    PASSPHRASE=$(get_backup_config PASSPHRASE) \
-      duplicity incremental \
-      $(duplicity_parameters_for_some_type "${type}") \
-      --full-if-older-than "$(get_backup_config OLDEST_FULL_BCK_AGE)" \
-      "${WORKSPACE_STORAGE_LOCATION}" \
-      "$(get_backup_config LOCATION)"
+    echo -n "Prepare dump of the whole PostgreSQL cluster dedicated to OpenHexa ... "
+    dumpfile_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-dumpall.sql"
+    pgpassfile=$(begin_pgsql_session localhost "${DATABASE_PORT}" "${DATABASE_USER}" "${DATABASE_PASSWORD}")
+    PGPASSFILE=$pgpassfile pg_dumpall --file "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}"
+    end_pgsql_session "${pgpassfile}"
     echo "OK"
-    echo -n "Remove DB cluster dump ... "
-    rm "${dumpfile_path}"
+
+    # Snapshot .env alongside the data. ENCRYPTION_KEY, SECRET_KEY,
+    # JUPYTERHUB_CRYPT_KEY, HUB_API_TOKEN and the admin passwords live
+    # only here; without them a DB restore is unrecoverable.
+    echo -n "Stage configuration snapshot (.env) ... "
+    envcopy_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-env.bak"
+    cp -a "$(dot_env_file)" "${envcopy_path}"
     echo "OK"
+
+    echo "Back up workspace files, PostgreSQL dump, and .env snapshot ..."
+    run_duplicity_backup "${WORKSPACE_STORAGE_LOCATION}" "${location}/workspaces" \
+      "${type}" "${passphrase}" "${oldest_full_age}" || rc=$?
+
+    if ((rc == 0)); then
+      echo "Back up Forgejo data (repos + SQLite metadata) ..."
+      run_duplicity_backup "${FORGEJO_STORAGE_LOCATION}" "${location}/forgejo" \
+        "${type}" "${passphrase}" "${oldest_full_age}" || rc=$?
+    fi
+
+    echo -n "Remove staged DB dump and env snapshot ... "
+    rm "${dumpfile_path}" "${envcopy_path}"
+    echo "OK"
+
+    if ((rc != 0)); then
+      echo "Backup FAILED (duplicity exit ${rc}). The data on the remote target may be incomplete."
+    fi
+    return $rc
   )
 }
+function perform_backup_status() {
+  require_backup_config || return 1
+  local location passphrase rc=0
+  location=$(get_backup_config LOCATION)
+  passphrase=$(get_backup_config PASSPHRASE)
+  for backend in workspaces forgejo; do
+    echo "=== ${backend} (${location}/${backend}) ==="
+    PASSPHRASE=$passphrase duplicity collection-status "${location}/${backend}" || rc=$?
+    echo
+  done
+  return $rc
+}
+
 function perform_restore() {
+  require_backup_config || return 1
   (
     load_env
-    echo -n "Keep a copy of the target ..."
+    local location passphrase dumpfile_path envcopy_path pgpassfile psql_exit_code psql_result running_services
+    location=$(get_backup_config LOCATION)
+    passphrase=$(get_backup_config PASSPHRASE)
+
+    echo -n "Check that no OpenHEXA services are running ... "
+    running_services=$(number_of_running_services)
+    if ((running_services > 0)); then
+      echo "KO"
+      echo "Refusing to restore while ${running_services} service(s) are running."
+      echo "Active connections would block DROP DATABASE during the dump replay."
+      echo "Stop everything first with: ./script/openhexa.sh stop"
+      return 1
+    fi
+    echo "OK"
+
+    echo -n "Keep a copy of the workspace target ... "
     mv "${WORKSPACE_STORAGE_LOCATION}" "${WORKSPACE_STORAGE_LOCATION}-$(date -Iseconds)"
     mkdir "${WORKSPACE_STORAGE_LOCATION}"
     echo "OK"
+
     echo -n "Restore workspace files ... "
-    PASSPHRASE=$(get_backup_config PASSPHRASE) \
+    PASSPHRASE=$passphrase \
       duplicity restore \
-      "$(get_backup_config LOCATION)" \
+      "${location}/workspaces" \
       "${WORKSPACE_STORAGE_LOCATION}"
     echo "OK"
 
-    echo -n "Restore PostgreSQL dump ..."
-    local dumpfile_path pgpassfile psql_exit_code psql_result
+    echo -n "Keep a copy of the Forgejo target ... "
+    mv "${FORGEJO_STORAGE_LOCATION}" "${FORGEJO_STORAGE_LOCATION}-$(date -Iseconds)"
+    mkdir "${FORGEJO_STORAGE_LOCATION}"
+    echo "OK"
+
+    echo -n "Restore Forgejo data ... "
+    PASSPHRASE=$passphrase \
+      duplicity restore \
+      "${location}/forgejo" \
+      "${FORGEJO_STORAGE_LOCATION}"
+    echo "OK"
+
+    echo -n "Restore PostgreSQL dump ... "
     dumpfile_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-dumpall.sql"
     if [[ ! -r $dumpfile_path ]]; then
       echo "KO: the dump file ${dumpfile_path} is not readable."
       return 1
     fi
     pgpassfile=$(begin_pgsql_session localhost "${DATABASE_PORT}" "${DATABASE_USER}" "${DATABASE_PASSWORD}")
-    psql_result=$(PGPASSFILE=$pgpassfile psql -f "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}" template1 2>&1)
+    psql_result=$(PGPASSFILE=$pgpassfile psql -v ON_ERROR_STOP=1 -f "${dumpfile_path}" --host localhost --port "${DATABASE_PORT}" --username "${DATABASE_USER}" template1 2>&1)
     psql_exit_code=$?
     end_pgsql_session "${pgpassfile}"
     if [[ $psql_exit_code -eq 0 ]]; then
       echo "OK"
       rm "${dumpfile_path}"
     else
-      echo "KO: ${psql_result}"
+      echo "KO"
+      echo
+      echo "===================== PostgreSQL restore FAILED ======================"
+      echo "psql exited with code ${psql_exit_code}. Output:"
+      echo
+      echo "${psql_result}"
+      echo
+      if echo "${psql_result}" | grep -qE 'already exists'; then
+        echo "Hint: the target cluster already contains OpenHEXA databases or roles. Drop them manually first."
+      fi
+      echo "The dump file has been kept at: ${dumpfile_path}"
+      echo "======================================================================"
+      return $psql_exit_code
     fi
-    return $psql_exit_code
+
+    envcopy_path="${WORKSPACE_STORAGE_LOCATION}/openhexa-env.bak"
+    if [[ -r $envcopy_path ]]; then
+      echo "Configuration snapshot restored to ${envcopy_path}."
+      echo "Compare it with $(dot_env_file) before discarding; the encryption keys must match the restored database."
+    fi
+    return 0
   )
 }
 
@@ -257,6 +378,13 @@ function execute() {
       echo "No"
       exit_code=1
     fi
+    echo -n "Forgejo HTTP Reachable: "
+    if is_forgejo_reachable; then
+      echo "Yes"
+    else
+      echo "No"
+      exit_code=1
+    fi
     echo "PostgreSQL: "
     echo -n "- accepting connections: "
     if is_db_accepting_connexion; then
@@ -288,6 +416,7 @@ function execute() {
     ;;
   prepare)
     run_compose_with_profiles run app fixtures --localhosting
+    run_compose_with_profiles run app python manage.py sync_git_orgs
     run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0
     ;;
@@ -297,6 +426,10 @@ function execute() {
     ;;
   backup)
     perform_backup
+    exit_properly $?
+    ;;
+  backup-status)
+    perform_backup_status
     exit_properly $?
     ;;
   restore)
