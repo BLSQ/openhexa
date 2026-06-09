@@ -117,7 +117,7 @@ services:
       retries: 3
 
   jupyter:
-    image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.17.2}
+    image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.17.8}
     platform: linux/amd64
     command: echo
     profiles:
