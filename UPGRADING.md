@@ -20,6 +20,19 @@ The package post-install hook runs `update` and `prepare` automatically on a
 **fresh** install. On an **upgrade** you should re-run them explicitly to
 apply the Django migrations introduced since your installed version.
 
+### Checking for new environment variables
+
+New releases sometimes add environment variables. `update` runs an automatic
+check and warns you when your `.env` is missing keys that exist in `.env.dist`.
+You can run the check on demand:
+
+```bash
+# Report keys present in .env.dist but missing from your .env:
+sudo /usr/share/openhexa/openhexa.sh -g env-check
+# Or check an env file at a non-standard location:
+sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
+```
+
 ---
 
 ## 5.x

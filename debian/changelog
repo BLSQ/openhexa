@@ -8,6 +8,10 @@ openhexa (5.10.1-1) stable; urgency=medium
   * Add UPGRADING.md documenting per-version manual upgrade steps (new
     environment variables, breaking changes, migration commands). See
     UPGRADING.md before upgrading an existing installation.
+  * Add `openhexa.sh env-check [ENV_FILE]` to diff your `.env` against
+    `.env.dist` and report keys missing after an upgrade. It runs
+    automatically at the start of `update`, so the post-install hook warns
+    about new variables without reading the docs.
 
  -- Bram Jans <bjans@bluesquarehub.com>  Tue, 23 Jun 2026 14:15:00 +0200
 
