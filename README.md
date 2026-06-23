@@ -521,6 +521,22 @@ server {
     }
 
 }
+
+# Support for webapps wildcard host:
+# Route all *.webapps.example.com subdomains (e.g. my-app.webapps.example.com) to the backend on port 8000.
+server {
+    listen 80;
+    client_max_body_size 500M;
+    server_name *.webapps.example.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 Enable and check it:
@@ -614,6 +630,32 @@ server {
         proxy_pass http://localhost:3000;
     }
 
+}
+
+# Support for webapps wildcard host:
+# Route all *.webapps.example.com subdomains (e.g. my-app.webapps.example.com) to the backend on port 8000.
+server {
+    client_max_body_size 500M;
+    server_name *.webapps.example.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+}
+
+
+server {
+    listen 80;
+    server_name *.webapps.example.com;
+    return 301 https://$host$request_uri;
 }
 ```
 
