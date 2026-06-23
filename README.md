@@ -297,11 +297,11 @@ simply redirect the website to a maintenance HTML page.
 
 Once configured, the following commands are available:
 
-| Command | Description |
-| --- | --- |
-| `/usr/share/openhexa/openhexa.sh backup` | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot. |
+| Command                                         | Description                                                                              |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `/usr/share/openhexa/openhexa.sh backup`        | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot.       |
 | `/usr/share/openhexa/openhexa.sh backup-status` | Show the duplicity `collection-status` for both the `workspaces` and `forgejo` backends. |
-| `/usr/share/openhexa/openhexa.sh restore` | Restore the latest backup. This requires stopping the services before a full restore. |
+| `/usr/share/openhexa/openhexa.sh restore`       | Restore the latest backup. This requires stopping the services before a full restore.    |
 
 After a restore, an `openhexa-env.bak` file is left next to the workspace data:
 compare it with the live `.env` to make sure `ENCRYPTION_KEY`, `SECRET_KEY` and
@@ -423,35 +423,17 @@ webapps on the main backend host.
 For custom-domain webapps, list each domain in `ADDITIONAL_ALLOWED_HOSTS`
 _and_ attach it to the corresponding Webapp via the Django admin.
 
-#### Upgrading from 4.6.0
+#### Upgrading an existing installation
 
-The 5.x series introduces Forgejo as a hard dependency. To upgrade an
-existing 4.6.0 installation:
+Upgrading an existing installation may require manual steps such as adding new environment
+variables, infrastructure changes, and one-off migration commands.
+These are documented per version, newest first, in [UPGRADING.md](./UPGRADING.md).
 
-```bash
-sudo systemctl stop openhexa
-sudo apt update && sudo apt install --only-upgrade openhexa
-# Pull the new app/frontend images and the Forgejo image:
-sudo /usr/share/openhexa/openhexa.sh -g update
-# Run migrations and bootstrap the Git server admin user:
-sudo /usr/share/openhexa/openhexa.sh -g prepare
-sudo systemctl start openhexa
-```
-
-The package post-install hook runs `update` and `prepare` automatically when
-installing for the first time, but on upgrades you should re-run them
-explicitly to apply Django migrations introduced between 4.6.0 and 5.6.2
-(custom webapp domains, AI agent tables, scheduled-run version selection,
-read-only table protection).
-
-The new `GIT_SERVER_ADMIN_PASSWORD` is generated only when `.env` does not
-yet exist. On an in-place upgrade, your existing `.env` will not contain
-this variable and you should add these env variables manually:
-
-```bash
-GIT_SERVER_ADMIN_USERNAME=openhexa-admin
-GIT_SERVER_ADMIN_PASSWORD=something-secure
-```
+> [!IMPORTANT]
+> `setup.sh` only generates `.env` on a **fresh** install, so new variables
+> added to `.env.dist` are not propagated to an existing `.env`. Always check
+> [UPGRADING.md](./UPGRADING.md) for the variables introduced since your
+> installed version before starting the upgraded stack.
 
 #### Test
 
