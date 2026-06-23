@@ -85,6 +85,9 @@ Finally, you can run openhexa with
 ./script/openhexa.sh start
 ```
 
+> [!IMPORTANT]
+> The first thing you'll want to do on your running instance is go to the Django admin (on `/admin`). There you can create an "organization" and give your superuser membership to it.
+
 To stop, execute
 
 ```bash
