@@ -523,6 +523,12 @@ server {
         proxy_buffering off;
     }
 
+    # Static Webapps auth-token endpoint is served by the backend (app),
+    # not the frontend, so route it directly to the backend port.
+    location /webapps/ {
+        proxy_pass http://localhost:8000;
+    }
+
 
     location / {
         proxy_pass http://localhost:3000;
@@ -544,6 +550,7 @@ You need to update on OpenHexa config in `/etc/openhexa/env.conf`:
 TRUST_FORWARDED_PROTO="false"
 PROXY_HOSTNAME_AND_PORT=example.com
 INTERNAL_BASE_URL=http://app:8000
+APP_PORT=8000
 FRONTEND_PORT=3000
 JUPYTERHUB_PORT=8001
 ```
@@ -610,6 +617,12 @@ server {
         proxy_buffering off;
     }
 
+    # Static Webapps auth-token endpoint is served by the backend (app),
+    # not the frontend, so route it directly to the backend port.
+    location /webapps/ {
+        proxy_pass http://localhost:8000;
+    }
+
 
     location / {
         proxy_pass http://localhost:3000;
@@ -624,6 +637,7 @@ and in `/etc/openhexa/env.conf`
 TRUST_FORWARDED_PROTO="true"
 PROXY_HOSTNAME_AND_PORT=example.com
 INTERNAL_BASE_URL=http://app:8000
+APP_PORT=8000
 FRONTEND_PORT=3000
 JUPYTERHUB_PORT=8001
 ```
