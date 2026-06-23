@@ -1,3 +1,12 @@
+openhexa (4.0-2) stable; urgency=medium
+
+  [ Bram Jans ]
+  * Update OpenHEXA to version 5.10.1
+  * Improved documentation for webapps Nginx config
+  * Improved `.env.dist` to more easily see changes on version upgrades
+
+ -- Bram Jans <bjans@bluesquarehub.com>  Tue, 23 Jun 2026 14:15:00 +0200
+
 openhexa (4.0-1) stable; urgency=medium
 
   [ Bram Jans ]
