@@ -134,6 +134,10 @@ The versions are described into the [changelog file](debian/changelog). The last
 one is unreleased and is the one that is published. To manage versions and
 changelog, we use the debhelper tool `dch`.
 
+**Version convention:** the package **upstream version equals the OpenHEXA
+app/frontend release it ships** (e.g. `5.10.1`), and must match the
+`blsq/openhexa-app` / `blsq/openhexa-frontend` tags in `compose.yml`.
+
 To add a new change, do:
 
 ```bash
@@ -169,7 +173,7 @@ working copy, and all your stage need to be clean. So, if you have any changes,
 commit or stash them before running the script.
 
 The resulting package is available in the parent directory:
-`../openhexa_1.0-1_amd64.deb`.
+`../openhexa_5.10.1-1_amd64.deb`.
 
 #### Install
 

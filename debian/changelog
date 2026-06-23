@@ -1,7 +1,9 @@
-openhexa (4.0-2) stable; urgency=medium
+openhexa (5.10.1-1) stable; urgency=medium
 
   [ Bram Jans ]
   * Update OpenHEXA to version 5.10.1
+  * Align the Debian package version with the OpenHEXA app/frontend version
+    it ships. This to avoid confusion about the version numbering.
   * Improved documentation for webapps Nginx config
   * Add UPGRADING.md documenting per-version manual upgrade steps (new
     environment variables, breaking changes, migration commands). See
