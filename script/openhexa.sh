@@ -31,6 +31,8 @@ function usage() {
     ps          reports running services
     config      reports the config used
     update      pulls last container images
+    env-check   reports keys in .env.dist missing from your .env
+                (optionally pass a path to the .env file to check)
     prepare     runs databases migrations and installs fixtures
     logs        gets all the logs
     backup         backs up OpenHexa
@@ -43,6 +45,21 @@ function usage() {
   fi
   local cmd=$1
   case $cmd in
+  env-check)
+    echo """
+
+    Usage:    env-check [ENV_FILE]
+
+    Diffs the keys defined in .env.dist against your .env and reports the
+    keys that are missing (added in newer versions) as well as keys
+    present in your .env but no longer in .env.dist.
+
+    ARGUMENTS:
+
+    ENV_FILE  path to the env file to check; defaults to the standard
+              location when omitted
+    """
+    ;;
   restore)
     echo """
 
@@ -343,6 +360,61 @@ function perform_restore() {
   )
 }
 
+function extract_env_keys() {
+  # Print the (uncommented) variable names defined in an env file, sorted and
+  # deduplicated. Commented examples (`# FOO=bar`) are intentionally ignored.
+  local file=$1
+  grep -E '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' "${file}" |
+    sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/' |
+    sort -u
+}
+
+function perform_env_check() {
+  local env_file dist_file missing extra
+  # Optionally check an arbitrary env file; the real one may live elsewhere
+  # or be named differently.
+  env_file=${1:-$(dot_env_file)}
+  dist_file=$(dist_dot_env_file)
+
+  if [[ ! -r $dist_file ]]; then
+    echo "Reference file ${dist_file} not found; cannot check the environment."
+    return 1
+  fi
+  if [[ ! -r $env_file ]]; then
+    echo "No environment file at ${env_file}; nothing to check."
+    echo "Run \`setup.sh env\` (or \`setup.sh all\`) to create it first."
+    return 1
+  fi
+
+  missing=$(comm -23 <(extract_env_keys "${dist_file}") <(extract_env_keys "${env_file}"))
+  extra=$(comm -13 <(extract_env_keys "${dist_file}") <(extract_env_keys "${env_file}"))
+
+  if [[ -z $missing ]]; then
+    echo "Your ${env_file} has every key from ${dist_file}."
+  else
+    echo "Missing in your ${env_file} (added in newer versions):"
+    while IFS= read -r key; do
+      [[ -n $key ]] && echo "  ${key}"
+    done <<<"${missing}"
+  fi
+
+  if [[ -n $extra ]]; then
+    echo
+    echo "Present in your ${env_file} but not in ${dist_file} (possibly removed/renamed):"
+    while IFS= read -r key; do
+      [[ -n $key ]] && echo "  ${key}"
+    done <<<"${extra}"
+  fi
+
+  if [[ -n $missing ]]; then
+    echo
+    echo "Add the missing keys to ${env_file}; the defaults are documented in ${dist_file}."
+    echo "Refer to the UPGRADING.md for guidance."
+    return 1
+  fi
+  return 0
+}
+
 function execute() {
   local command=$1
   local exit_code=0
@@ -411,8 +483,15 @@ function execute() {
     exit_properly 0
     ;;
   update)
+    # Warn (don't block) if the .env is missing keys added in newer versions.
+    perform_env_check || true
+    echo
     run_compose_with_profiles --profile spawned-notebook pull --policy always
     exit_properly 0
+    ;;
+  env-check)
+    perform_env_check "$COMMAND_PARAMETERS"
+    exit_properly $?
     ;;
   prepare)
     run_compose_with_profiles run app fixtures --localhosting

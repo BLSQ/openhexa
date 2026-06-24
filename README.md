@@ -85,6 +85,9 @@ Finally, you can run openhexa with
 ./script/openhexa.sh start
 ```
 
+> [!IMPORTANT]
+> The first thing you'll want to do on your running instance is go to the Django admin (on `/admin`). There you can create an "organization" and give your superuser membership to it.
+
 To stop, execute
 
 ```bash
@@ -134,6 +137,10 @@ The versions are described into the [changelog file](debian/changelog). The last
 one is unreleased and is the one that is published. To manage versions and
 changelog, we use the debhelper tool `dch`.
 
+**Version convention:** the package **upstream version equals the OpenHEXA
+app/frontend release it ships** (e.g. `5.10.1`), and must match the
+`blsq/openhexa-app` / `blsq/openhexa-frontend` tags in `compose.yml`.
+
 To add a new change, do:
 
 ```bash
@@ -169,7 +176,7 @@ working copy, and all your stage need to be clean. So, if you have any changes,
 commit or stash them before running the script.
 
 The resulting package is available in the parent directory:
-`../openhexa_1.0-1_amd64.deb`.
+`../openhexa_5.10.1-1_amd64.deb`.
 
 #### Install
 
@@ -297,11 +304,11 @@ simply redirect the website to a maintenance HTML page.
 
 Once configured, the following commands are available:
 
-| Command | Description |
-| --- | --- |
-| `/usr/share/openhexa/openhexa.sh backup` | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot. |
+| Command                                         | Description                                                                              |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `/usr/share/openhexa/openhexa.sh backup`        | Back up the PostgreSQL cluster, workspace files, Forgejo data and `.env` snapshot.       |
 | `/usr/share/openhexa/openhexa.sh backup-status` | Show the duplicity `collection-status` for both the `workspaces` and `forgejo` backends. |
-| `/usr/share/openhexa/openhexa.sh restore` | Restore the latest backup. This requires stopping the services before a full restore. |
+| `/usr/share/openhexa/openhexa.sh restore`       | Restore the latest backup. This requires stopping the services before a full restore.    |
 
 After a restore, an `openhexa-env.bak` file is left next to the workspace data:
 compare it with the live `.env` to make sure `ENCRYPTION_KEY`, `SECRET_KEY` and
@@ -423,35 +430,17 @@ webapps on the main backend host.
 For custom-domain webapps, list each domain in `ADDITIONAL_ALLOWED_HOSTS`
 _and_ attach it to the corresponding Webapp via the Django admin.
 
-#### Upgrading from 4.6.0
+#### Upgrading an existing installation
 
-The 5.x series introduces Forgejo as a hard dependency. To upgrade an
-existing 4.6.0 installation:
+Upgrading an existing installation may require manual steps such as adding new environment
+variables, infrastructure changes, and one-off migration commands.
+These are documented per version, newest first, in [UPGRADING.md](./UPGRADING.md).
 
-```bash
-sudo systemctl stop openhexa
-sudo apt update && sudo apt install --only-upgrade openhexa
-# Pull the new app/frontend images and the Forgejo image:
-sudo /usr/share/openhexa/openhexa.sh -g update
-# Run migrations and bootstrap the Git server admin user:
-sudo /usr/share/openhexa/openhexa.sh -g prepare
-sudo systemctl start openhexa
-```
-
-The package post-install hook runs `update` and `prepare` automatically when
-installing for the first time, but on upgrades you should re-run them
-explicitly to apply Django migrations introduced between 4.6.0 and 5.6.2
-(custom webapp domains, AI agent tables, scheduled-run version selection,
-read-only table protection).
-
-The new `GIT_SERVER_ADMIN_PASSWORD` is generated only when `.env` does not
-yet exist. On an in-place upgrade, your existing `.env` will not contain
-this variable and you should add these env variables manually:
-
-```bash
-GIT_SERVER_ADMIN_USERNAME=openhexa-admin
-GIT_SERVER_ADMIN_PASSWORD=something-secure
-```
+> [!IMPORTANT]
+> `setup.sh` only generates `.env` on a **fresh** install, so new variables
+> added to `.env.dist` are not propagated to an existing `.env`. Always check
+> [UPGRADING.md](./UPGRADING.md) for the variables introduced since your
+> installed version before starting the upgraded stack.
 
 #### Test
 
@@ -523,11 +512,33 @@ server {
         proxy_buffering off;
     }
 
+    # Static Webapps auth-token endpoint is served by the backend (app),
+    # not the frontend, so route it directly to the backend port.
+    location /webapps/ {
+        proxy_pass http://localhost:8000;
+    }
+
 
     location / {
         proxy_pass http://localhost:3000;
     }
 
+}
+
+# Support for webapps wildcard host:
+# Route all *.webapps.example.com subdomains (e.g. my-app.webapps.example.com) to the backend on port 8000.
+server {
+    listen 80;
+    client_max_body_size 500M;
+    server_name *.webapps.example.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
@@ -544,6 +555,7 @@ You need to update on OpenHexa config in `/etc/openhexa/env.conf`:
 TRUST_FORWARDED_PROTO="false"
 PROXY_HOSTNAME_AND_PORT=example.com
 INTERNAL_BASE_URL=http://app:8000
+APP_PORT=8000
 FRONTEND_PORT=3000
 JUPYTERHUB_PORT=8001
 ```
@@ -610,11 +622,43 @@ server {
         proxy_buffering off;
     }
 
+    # Static Webapps auth-token endpoint is served by the backend (app),
+    # not the frontend, so route it directly to the backend port.
+    location /webapps/ {
+        proxy_pass http://localhost:8000;
+    }
+
 
     location / {
         proxy_pass http://localhost:3000;
     }
 
+}
+
+# Support for webapps wildcard host:
+# Route all *.webapps.example.com subdomains (e.g. my-app.webapps.example.com) to the backend on port 8000.
+server {
+    client_max_body_size 500M;
+    server_name *.webapps.example.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+}
+
+
+server {
+    listen 80;
+    server_name *.webapps.example.com;
+    return 301 https://$host$request_uri;
 }
 ```
 
@@ -624,6 +668,7 @@ and in `/etc/openhexa/env.conf`
 TRUST_FORWARDED_PROTO="true"
 PROXY_HOSTNAME_AND_PORT=example.com
 INTERNAL_BASE_URL=http://app:8000
+APP_PORT=8000
 FRONTEND_PORT=3000
 JUPYTERHUB_PORT=8001
 ```
