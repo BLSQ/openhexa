@@ -496,6 +496,10 @@ function execute() {
   prepare)
     run_compose_with_profiles run app fixtures --localhosting
     run_compose_with_profiles run app python manage.py sync_git_orgs
+    # Provisions the git proxy service account (password synced to
+    # GIT_PROXY_PASSWORD) and backfills branch protection + proxy write
+    # access on every webapp repository. Idempotent.
+    run_compose_with_profiles run app python manage.py sync_git_repositories
     run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0
     ;;

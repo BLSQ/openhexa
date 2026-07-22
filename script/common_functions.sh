@@ -27,6 +27,8 @@ function setup() {
     WORKSPACE_DATA_DIRECTORY="/var/lib/openhexa/workspaces"
     FORGEJO_DATA_DIRECTORY="/var/lib/openhexa/forgejo_data"
     FORGEJO_ENTRYPOINT_PATH="/usr/share/openhexa/forgejo/entrypoint.sh"
+    GIT_PROXY_ENTRYPOINT_PATH="/usr/share/openhexa/git-proxy/entrypoint.sh"
+    GIT_PROXY_CONF_TEMPLATE_PATH="/usr/share/openhexa/git-proxy/git-proxy.conf.template"
   fi
   if ((UID == 0)); then
     SUDO_COMMAND=""
@@ -100,6 +102,8 @@ function run_compose() {
     OH_GID="${oh_gid}" \
     DOCKER_GID="${docker_gid}" \
     FORGEJO_ENTRYPOINT_PATH="${FORGEJO_ENTRYPOINT_PATH}" \
+    GIT_PROXY_ENTRYPOINT_PATH="${GIT_PROXY_ENTRYPOINT_PATH}" \
+    GIT_PROXY_CONF_TEMPLATE_PATH="${GIT_PROXY_CONF_TEMPLATE_PATH}" \
     docker compose \
     --env-file "${CONFIG_FILE_PATH}" \
     --file "${COMPOSE_FILE_PATH}" \
