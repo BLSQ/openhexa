@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:5.10.1"
+    image: "blsq/openhexa-app:5.12.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -59,7 +59,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:5.10.1"
+    image: "blsq/openhexa-frontend:5.12.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -196,6 +196,8 @@ services:
       USER_GID: ${OH_GID:-1000}
       GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
       GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
+      GIT_PROXY_USERNAME: ${GIT_PROXY_USERNAME}
+      GIT_PROXY_PASSWORD: ${GIT_PROXY_PASSWORD}
       FORGEJO__database__DB_TYPE: sqlite3
       FORGEJO__security__INSTALL_LOCK: "true"
       FORGEJO__server__ROOT_URL: "http://localhost:${FORGEJO_PORT:-3100}/"
@@ -210,6 +212,41 @@ services:
     restart: unless-stopped
     healthcheck:
       test: curl -fs "http://localhost:3000/api/healthz" || exit 1
+      interval: "60s"
+      timeout: "3s"
+      start_period: "10s"
+      retries: 3
+
+  # Nginx proxy exposing the Forgejo Git server to git clients (clone, pull,
+  # push) since OpenHEXA 5.11.0. It authenticates requests against the
+  # OpenHEXA backend (OAuth) and forwards allowed git traffic to Forgejo as
+  # the non-admin proxy service account. Users reach it at GIT_PUBLIC_URL.
+  git_proxy:
+    image: nginx:alpine
+    platform: linux/amd64
+    container_name: git_proxy
+    networks:
+      - openhexa
+    depends_on:
+      - app
+      - forgejo
+    environment:
+      # Upstreams on the local Docker network
+      APP_UPSTREAM: app:8000
+      FORGEJO_UPSTREAM: forgejo:3000
+      GIT_PROXY_USERNAME: ${GIT_PROXY_USERNAME}
+      GIT_PROXY_PASSWORD: ${GIT_PROXY_PASSWORD}
+    volumes:
+      - ${GIT_PROXY_CONF_TEMPLATE_PATH:-./git-proxy/git-proxy.conf.template}:/etc/nginx/templates/git-proxy.conf.template:ro
+      - ${GIT_PROXY_ENTRYPOINT_PATH:-./git-proxy/entrypoint.sh}:/git-proxy-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/git-proxy-entrypoint.sh"]
+    ports:
+      - "${GIT_PROXY_PORT:-3200}:3000"
+    restart: unless-stopped
+    healthcheck:
+      # An unauthenticated request must get the Basic-auth challenge back;
+      # that proves nginx is up and the authorization wiring answers.
+      test: wget --spider "http://127.0.0.1:3000/" 2>&1 | grep -q "401" || exit 1
       interval: "60s"
       timeout: "3s"
       start_period: "10s"

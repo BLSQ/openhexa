@@ -35,6 +35,56 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.12.0
+
+Covers upgrades from 5.10.1 (includes the 5.11.0 and 5.11.1 changes).
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# Git proxy (since 5.11.0): non-admin service account the proxy forwards git
+# traffic as. Set the password yourself on upgrade (setup.sh only generates
+# it on fresh installs); `prepare` syncs the Forgejo account to this value.
+GIT_PROXY_USERNAME=openhexa-proxy
+GIT_PROXY_PASSWORD=something-secure   # set this yourself on upgrade
+
+# Public URL where git clients reach the git proxy; shown to users as the
+# repository clone URL. Point it at this host's port 3200 (GIT_PROXY_PORT),
+# or at your reverse proxy if you put one in front.
+GIT_PUBLIC_URL=http://localhost:3200
+
+# Enable object versioning on newly created buckets (gcp and s3 storage
+# backends; ignored elsewhere).
+WORKSPACE_BUCKET_VERSIONING_ENABLED=true
+
+# Hard ceiling on the number of rows the executeSQL API query can return.
+WORKSPACE_DATABASE_QUERY_MAX_ROWS=100000
+
+# Keep false on local hostings: organizations configure their own AI
+# provider, model and API key in the application.
+ASSISTANT_MANAGED=false
+```
+
+### Breaking changes
+
+- A new **`git_proxy` service** (image `nginx:alpine`) is part of the stack.
+  It exposes the Forgejo Git server to git clients (clone, pull, push of
+  static webapp repositories) on host port `3200` (override with
+  `GIT_PROXY_PORT`), authenticating users against OpenHEXA OAuth. It starts
+  automatically with the other services; make sure host port `3200` is free.
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading: besides the Django migrations
+(Data Studio, workspace duplication, organization-level AI settings), it runs
+the new `sync_git_repositories` command, which provisions the git proxy
+service account in Forgejo (password synced to `GIT_PROXY_PASSWORD`) and
+backfills branch protection and proxy write access on existing webapp
+repositories.
+
 ## 5.x
 
 OpenHEXA 5.x introduces Forgejo as a hard dependency (it backs the Static Webapps feature).

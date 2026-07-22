@@ -494,8 +494,13 @@ function execute() {
     exit_properly $?
     ;;
   prepare)
+    echo -n "Run app migrations and create superuser and fixtures"
     run_compose_with_profiles run app fixtures --localhosting
+    echo -n "Sync git organizations"
     run_compose_with_profiles run app python manage.py sync_git_orgs
+    echo -n "Sync git repositories" # idempotent, backfill branch protection + proxy write access
+    run_compose_with_profiles run app python manage.py sync_git_repositories
+    echo -n "Run jupyterhub upgrade-db"
     run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0
     ;;
