@@ -1,3 +1,10 @@
+openhexa (5.12.0-2) stable; urgency=medium
+
+  [ Bram Jans ]
+  * Update blsq/openhexa-base-environment to 1.17.10 (S3 FUSE mounting fix)
+
+ -- Bram Jans <ik@bramjans.com>  Fri, 24 Jul 2026 10:21:31 +0200
+
 openhexa (5.12.0-1) stable; urgency=medium
 
   [ Bram Jans ]
