@@ -177,7 +177,7 @@ working copy, and all your stage need to be clean. So, if you have any changes,
 commit or stash them before running the script.
 
 The resulting package is available in the parent directory:
-`../openhexa_5.12.0-1_amd64.deb`.
+`../openhexa_5.12.0-2_amd64.deb`.
 
 #### Install
 
