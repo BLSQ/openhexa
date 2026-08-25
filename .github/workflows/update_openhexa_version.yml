@@ -1,0 +1,205 @@
+name: update_openhexa_version
+run-name: Check for a new OpenHEXA release
+
+# Opens a pull request that upgrades this Debian packaging to the newest stable
+# BLSQ/openhexa-app release. The `check` job compares the latest release on
+# openhexa-app with the latest debian image version.
+# If a new version is found: `upgrade` job start Claude Code, which runs 
+# .claude/skills/update-openhexa-version/SKILL.md and opens a PR as blsqbot.
+#
+on:
+  schedule:
+    - cron: "17 * * * *" # 17 minutes past the hour
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Target OpenHEXA version (default: latest stable upstream release)"
+        required: false
+        default: ""
+      model:
+        description: "Claude model override (default: the CLAUDE_MODEL repo variable)"
+        required: false
+        default: ""
+      force:
+        description: "Run even if a branch or PR for this version already exists"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write # required for the GCP Workload Identity Federation OIDC exchange
+
+concurrency:
+  # Never let two upgrade runs race for the same branch.
+  group: update-openhexa-version
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: BLSQ/openhexa-app
+  BOT_LOGIN: blsqbot
+  # Set this to the <id>+blsqbot@users.noreply.github.com form if you want the
+  # commits linked to the blsqbot profile page; the plain form still pushes.
+  BOT_EMAIL: blsqbot@users.noreply.github.com
+
+jobs:
+  check:
+    name: Check for a newer release
+    runs-on: ubuntu-latest
+    outputs:
+      needs_update: ${{ steps.compare.outputs.needs_update }}
+      current: ${{ steps.compare.outputs.current }}
+      target: ${{ steps.compare.outputs.target }}
+      branch: ${{ steps.compare.outputs.branch }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Compare packaged version against the latest upstream release
+        id: compare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+
+          skip() {
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+            echo "$1" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
+
+          # The version this repo currently packages.
+          CURRENT=$(sed -n 's/.*image: "blsq\/openhexa-app:\([^"]*\)".*/\1/p' compose.yml | head -1)
+          if [ -z "$CURRENT" ]; then
+            echo "::error::could not read the blsq/openhexa-app image tag from compose.yml"
+            exit 1
+          fi
+
+          # The version we want. /releases/latest already excludes drafts and
+          # pre-releases, so only stable releases ever trigger a run.
+          TARGET="${INPUT_VERSION#v}"
+          if [ -z "$TARGET" ]; then
+            TARGET=$(gh api "repos/$UPSTREAM_REPO/releases/latest" --jq .tag_name)
+            TARGET="${TARGET#v}"
+          fi
+          if ! printf '%s' "$TARGET" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::unexpected upstream version '$TARGET' (want X.Y.Z)"
+            exit 1
+          fi
+
+          BRANCH="chore/openhexa-$TARGET"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Packaged: $CURRENT | latest upstream: $TARGET"
+
+          if [ "$TARGET" = "$CURRENT" ]; then
+            skip "Already on $CURRENT — nothing to do."
+          fi
+
+          NEWEST=$(printf '%s\n%s\n' "$CURRENT" "$TARGET" | sort -V | tail -n1)
+          if [ "$NEWEST" != "$TARGET" ]; then
+            skip "Packaged version $CURRENT is newer than upstream $TARGET — nothing to do."
+          fi
+
+          if [ "$FORCE" = "true" ]; then
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+            echo "Forced run for $CURRENT -> $TARGET." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # An existing PR or branch for this exact target means a previous run
+          # already did the work.
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          OPEN=$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$OWNER:$BRANCH" --jq 'length')
+          if [ "$OPEN" != "0" ]; then
+            skip "PR for $TARGET is already open — nothing to do."
+          fi
+          if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            skip "Branch $BRANCH already exists — nothing to do."
+          fi
+
+          echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          echo "New release found: $CURRENT -> $TARGET." >> "$GITHUB_STEP_SUMMARY"
+
+  upgrade:
+    name: Open the upgrade PR
+    needs: check
+    if: needs.check.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # The PAT (not GITHUB_TOKEN) so the pushed branch triggers
+          # build_debian_package.yml and the PR is authored by blsqbot.
+          token: ${{ secrets.BLSQBOT_TOKEN }}
+          # The skill diffs historical commits as an upgrade reference.
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "$BOT_LOGIN"
+          git config user.email "$BOT_EMAIL"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Run the update-openhexa-version skill
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_VERTEX_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          CLOUD_ML_REGION: ${{ vars.CLOUD_ML_REGION || 'eu' }}
+          # So `gh` inside Claude's Bash tool acts as blsqbot.
+          GH_TOKEN: ${{ secrets.BLSQBOT_TOKEN }}
+        with:
+          use_vertex: "true"
+          github_token: ${{ secrets.BLSQBOT_TOKEN }}
+          claude_args: >-
+            --model ${{ inputs.model || vars.CLAUDE_MODEL || 'claude-opus-4-6' }}
+            --allowedTools Bash,Read,Write,Edit,Glob,Grep
+          prompt: |
+            Upgrade this repository's Debian packaging from OpenHEXA
+            ${{ needs.check.outputs.current }} to ${{ needs.check.outputs.target }}.
+
+            Follow .claude/skills/update-openhexa-version/SKILL.md exactly,
+            including its "Running in CI" section. Steps 0-5 drive the edits;
+            step 6's report becomes the pull request description.
+
+            Context already established — do not spend turns re-verifying it:
+            - Current packaged version, from compose.yml: ${{ needs.check.outputs.current }}
+            - Target version: ${{ needs.check.outputs.target }}
+            - The target is a published, non-draft, non-prerelease upstream
+              release, and is newer than the current one.
+            - No open pull request and no remote branch exists for the target.
+
+            When the edits are done and verified:
+            1. git checkout -b ${{ needs.check.outputs.branch }}
+            2. Commit every changed file. Use the commit message
+               "chore: Update to OH ${{ needs.check.outputs.target }}",
+               matching this repo's existing history, with a short body.
+            3. git push -u origin ${{ needs.check.outputs.branch }}
+            4. Open a pull request against main with `gh pr create`:
+               - Title: chore: Update to OH ${{ needs.check.outputs.target }}
+               - Body: the full step 6 report — the upstream findings summary
+                 release by release, every file edited and why, and a clearly
+                 separated "Needs a human" section listing everything flagged
+                 but not done: companion image requirements and any script
+                 cascade that needs its own testing.
+               - Close the body with a line saying the PR was opened
+                 automatically by the update_openhexa_version workflow.
+
+            Constraints:
+            - Never push to main. Only ${{ needs.check.outputs.branch }}.
+            - Never bump the blsq/openhexa-base-environment or
+              blsq/openhexa-jupyterhub tags — Renovate owns those. If the
+              release requires newer ones, say so in the PR body instead.
+            - If you cannot complete the upgrade correctly, do not open a
+              half-finished PR. Leave the branch unpushed and fail with an
+              explanation of what blocked you.
