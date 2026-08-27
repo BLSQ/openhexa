@@ -11,3 +11,4 @@ backup/
 workspaces-*
 forgejo_data-*
 .artifacts/
+.claude/settings.local.json
