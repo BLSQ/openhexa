@@ -10,8 +10,9 @@ run-name: Check for a new OpenHEXA release
 on:
   schedule:
     - cron: "17 * * * *" # 17 minutes past the hour
-  push:
-    branches: [automate-image-upgrade-pr] # TEMP: remove before merge
+  pull_request:
+    branches: [main] # TEMP: remove before merge (claude-code-action rejects push events)
+    paths: [.github/workflows/update_openhexa_version.yml]
   workflow_dispatch:
     inputs:
       version:
