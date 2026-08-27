@@ -139,7 +139,7 @@ one is unreleased and is the one that is published. To manage versions and
 changelog, we use the debhelper tool `dch`.
 
 **Version convention:** the package **upstream version equals the OpenHEXA
-app/frontend release it ships** (e.g. `5.12.0`), and must match the
+app/frontend release it ships** (e.g. `5.16.1`), and must match the
 `blsq/openhexa-app` / `blsq/openhexa-frontend` tags in `compose.yml`.
 
 To add a new change, do:
@@ -177,7 +177,7 @@ working copy, and all your stage need to be clean. So, if you have any changes,
 commit or stash them before running the script.
 
 The resulting package is available in the parent directory:
-`../openhexa_5.12.0-2_amd64.deb`.
+`../openhexa_5.16.1-1_amd64.deb`.
 
 #### Install
 
