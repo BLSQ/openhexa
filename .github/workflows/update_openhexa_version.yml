@@ -161,6 +161,17 @@ jobs:
           CLOUD_ML_REGION: europe-west1
           # So `gh` inside Claude's Bash tool acts as blsqbot.
           GH_TOKEN: ${{ secrets.BLSQBOT_TOKEN }}
+          # Telemetry -> Logfire (events + metrics over OTLP; token is a
+          # Logfire write token, passed bare with no Bearer prefix).
+          CLAUDE_CODE_ENABLE_TELEMETRY: "1"
+          OTEL_METRICS_EXPORTER: otlp
+          OTEL_LOGS_EXPORTER: otlp
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+          OTEL_EXPORTER_OTLP_ENDPOINT: https://logfire-eu.pydantic.dev
+          OTEL_EXPORTER_OTLP_HEADERS: Authorization=${{ secrets.LOGFIRE_WRITE_TOKEN }}
+          OTEL_SERVICE_NAME: update-openhexa-version
+          OTEL_RESOURCE_ATTRIBUTES: gh.run_id=${{ github.run_id }},gh.target=${{ needs.check.outputs.target }}
+          OTEL_METRIC_EXPORT_INTERVAL: "10000"
         with:
           use_vertex: "true"
           github_token: ${{ secrets.BLSQBOT_TOKEN }}
