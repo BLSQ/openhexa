@@ -4,7 +4,7 @@ run-name: Check for a new OpenHEXA release
 # Opens a pull request that upgrades this Debian packaging to the newest stable
 # BLSQ/openhexa-app release. The `check` job compares the latest release on
 # openhexa-app with the latest debian image version.
-# If a new version is found: `upgrade` job start Claude Code, which runs 
+# If a new version is found: `upgrade` job start Claude Code, which runs
 # .claude/skills/update-openhexa-version/SKILL.md and opens a PR as blsqbot.
 #
 on:
@@ -155,7 +155,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          CLOUD_ML_REGION: ${{ vars.CLOUD_ML_REGION || 'eu' }}
+          CLOUD_ML_REGION: europe-west1
           # So `gh` inside Claude's Bash tool acts as blsqbot.
           GH_TOKEN: ${{ secrets.BLSQBOT_TOKEN }}
         with:
