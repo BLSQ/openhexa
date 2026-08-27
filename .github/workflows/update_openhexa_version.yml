@@ -143,11 +143,6 @@ jobs:
           # The skill diffs historical commits as an upgrade reference.
           fetch-depth: 0
 
-      - name: Configure git identity
-        run: |
-          git config user.name "$BOT_LOGIN"
-          git config user.email "$BOT_EMAIL"
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -161,6 +156,10 @@ jobs:
           CLOUD_ML_REGION: europe-west1
           # So `gh` inside Claude's Bash tool acts as blsqbot.
           GH_TOKEN: ${{ secrets.BLSQBOT_TOKEN }}
+          GIT_AUTHOR_NAME: ${{ env.BOT_LOGIN }}
+          GIT_AUTHOR_EMAIL: ${{ env.BOT_EMAIL }}
+          GIT_COMMITTER_NAME: ${{ env.BOT_LOGIN }}
+          GIT_COMMITTER_EMAIL: ${{ env.BOT_EMAIL }}
           # Telemetry -> Logfire (events + metrics over OTLP; token is a
           # Logfire write token, passed bare with no Bearer prefix).
           CLAUDE_CODE_ENABLE_TELEMETRY: "1"
