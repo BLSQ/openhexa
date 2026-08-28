@@ -1,3 +1,19 @@
+openhexa (5.16.1-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.16.1
+  * New environment variables in .env.dist: DATABASE_USER_READ_ONLY and
+    DATABASE_PASSWORD_READ_ONLY (read-only database user for the Django SQL
+    dashboards feature, introduced in 5.13.0)
+  * Update git-proxy nginx template: add client_max_body_size 0 to the
+    catch-all location for large webapp file support (5.16.1)
+  * Notable upstream features since 5.12.0: Data Studio saved queries with
+    CSV export, SQL query auditing and Django admin dashboards, workspace
+    tagging by admins, account workspace tokens, AI SQL query agent,
+    schema-aware SQL autocomplete, SQL formatting, webapp local dev workflow
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Fri, 28 Aug 2026 07:27:21 +0000
+
 openhexa (5.12.0-2) stable; urgency=medium
 
   [ Bram Jans ]
