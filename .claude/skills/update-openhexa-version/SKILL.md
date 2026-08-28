@@ -111,7 +111,9 @@ openhexa (<TARGET>-1) stable; urgency=medium
 
 - Version is `<TARGET>-1` (package version = OpenHEXA version; the old
   `N.0-1` scheme in stanzas before 5.10.1-1 is obsolete).
-- Author name/email come from `git config user.name` / `user.email`.
+- Author name/email come from `git config user.name` / `user.email` when a
+  human runs this skill; in CI the stanza is authored by blsqbot instead —
+  see "Running in CI".
 - The trailer line starts with one space, and has two spaces before the date.
 - Detail scales with the release: a routine bump gets one or two bullets,
   a feature bump itemizes new ENV vars, services, and breaking changes
@@ -149,12 +151,17 @@ introduced (see the "Forgejo Git server" section as the model).
 
 When the `CI` environment variable is set, this skill is being run by the
 `update_openhexa_version` GitHub Actions workflow, not by a human at a
-terminal. Two things change:
+terminal. Three things change:
 
 1. **Step 6's "no commit" rule is lifted.** Commit the working-tree changes to
    a new branch and open a pull request instead of stopping. Everything in
    steps 0–5 is unchanged — the research still drives the edits.
-2. **The report goes in the PR body, not the terminal.** Everything Step 6
+2. **The changelog stanza is authored by blsqbot.** In Step 4, use the
+   workflow's `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` environment variables
+   (`blsqbot <blsqbot@users.noreply.github.com>`) for both the `[ ... ]`
+   header and the ` -- ` trailer line — do not read `git config`, which is
+   unset in CI, and never attribute the stanza to Claude or a maintainer.
+3. **The report goes in the PR body, not the terminal.** Everything Step 6
    says to report — the upstream findings summary, every file edited and why,
    and anything flagged but not done (companion image requirements, script
    cascades needing their own testing) — belongs in the pull request
