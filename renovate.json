@@ -2,5 +2,16 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "prConcurrentLimit": 3,
+  "packageRules": [
+    {
+      "description": "OpenHEXA app/frontend tags are bumped by the update_openhexa_version workflow",
+      "matchPackageNames": [
+        "blsq/openhexa-app",
+        "blsq/openhexa-frontend"
+      ],
+      "enabled": false
+    }
   ]
 }
