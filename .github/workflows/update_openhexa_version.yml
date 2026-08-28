@@ -160,17 +160,27 @@ jobs:
           GIT_AUTHOR_EMAIL: ${{ env.BOT_EMAIL }}
           GIT_COMMITTER_NAME: ${{ env.BOT_LOGIN }}
           GIT_COMMITTER_EMAIL: ${{ env.BOT_EMAIL }}
-          # Telemetry -> Logfire (events + metrics over OTLP; token is a
-          # Logfire write token, passed bare with no Bearer prefix).
+          # Telemetry -> Logfire (events + metrics + traces over OTLP; token is
+          # a Logfire write token, passed bare with no Bearer prefix).
           CLAUDE_CODE_ENABLE_TELEMETRY: "1"
+          # Tracing is beta: span trees per interaction (llm_request spans carry
+          # model, tokens, stop_reason, ttft) — the schema may shift between
+          # claude-code-action versions.
+          CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: "1"
           OTEL_METRICS_EXPORTER: otlp
           OTEL_LOGS_EXPORTER: otlp
+          OTEL_TRACES_EXPORTER: otlp
           OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
           OTEL_EXPORTER_OTLP_ENDPOINT: https://logfire-eu.pydantic.dev
           OTEL_EXPORTER_OTLP_HEADERS: Authorization=${{ secrets.LOGFIRE_WRITE_TOKEN }}
           OTEL_SERVICE_NAME: update-openhexa-version
-          OTEL_RESOURCE_ATTRIBUTES: gh.run_id=${{ github.run_id }},gh.target=${{ needs.check.outputs.target }}
+          OTEL_RESOURCE_ATTRIBUTES: gh.run_id=${{ github.run_id }},gh.target=${{ needs.check.outputs.target }},gh.model=${{ inputs.model || vars.CLAUDE_MODEL || 'claude-opus-4-6' }}
           OTEL_METRIC_EXPORT_INTERVAL: "10000"
+          # This project's own Logfire, and the prompt is public in this file —
+          # safe to log content that is redacted by default.
+          OTEL_LOG_TOOL_DETAILS: "1"
+          OTEL_LOG_USER_PROMPTS: "1"
+          OTEL_LOG_ASSISTANT_RESPONSES: "1"
         with:
           use_vertex: "true"
           github_token: ${{ secrets.BLSQBOT_TOKEN }}
@@ -197,6 +207,7 @@ jobs:
             2. Commit every changed file. Use the commit message
                "chore: Update to OH ${{ needs.check.outputs.target }}",
                matching this repo's existing history, with a short body.
+               DO NOT attribute co-authorship to Claude.
             3. git push -u origin ${{ needs.check.outputs.branch }}
             4. Open a pull request against main with `gh pr create`:
                - Title: chore: Update to OH ${{ needs.check.outputs.target }}
