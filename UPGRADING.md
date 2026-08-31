@@ -35,6 +35,30 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.17.0
+
+Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# Read-only database credentials for Django SQL dashboards (since 5.13.0).
+# On a typical single-server install these can point at the same PostgreSQL
+# user as the main app; a dedicated read-only role is recommended in
+# production.
+DATABASE_USER_READ_ONLY=hexa-app
+DATABASE_PASSWORD_READ_ONLY=hexa-app
+```
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading to apply the Django migrations
+introduced across the 5.13–5.17 series (Data Studio saved queries, query
+logging, workspace tags, workspace identity tokens).
+
 ## 5.12.0
 
 Covers upgrades from 5.10.1 (includes the 5.11.0 and 5.11.1 changes).
