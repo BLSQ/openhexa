@@ -41,17 +41,7 @@ Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).
 
 ### New environment variables
 
-Append the variables you are missing to your `.env` (the defaults in this list
-match `.env.dist`).
-
-```bash
-# Read-only database credentials for Django SQL dashboards (since 5.13.0).
-# On a typical single-server install these can point at the same PostgreSQL
-# user as the main app; a dedicated read-only role is recommended in
-# production.
-DATABASE_USER_READ_ONLY=hexa-app
-DATABASE_PASSWORD_READ_ONLY=hexa-app
-```
+None.
 
 ### Manual steps
 

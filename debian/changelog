@@ -2,14 +2,10 @@ openhexa (5.17.0-1) stable; urgency=medium
 
   [ blsqbot ]
   * Update OpenHEXA to version 5.17.0
-  * New environment variables in .env.dist: DATABASE_USER_READ_ONLY and
-    DATABASE_PASSWORD_READ_ONLY (read-only database credentials for the
-    Django SQL Dashboard feature, introduced in 5.13.0)
   * Features across 5.13.0–5.17.0: Data Studio saved queries, CSV export,
     SQL formatting and autocomplete, SQL query auditing (QueryLog),
-    Django admin SQL dashboards, workspace tags, workspace tokens in
-    account settings, AI agent workspace description context, dataset
-    copying in workspace duplication
+    workspace tags, workspace tokens in account settings, AI agent
+    workspace description context, dataset copying in workspace duplication
 
  -- blsqbot <blsqbot@users.noreply.github.com>  Mon, 31 Aug 2026 13:30:40 +0000
 
