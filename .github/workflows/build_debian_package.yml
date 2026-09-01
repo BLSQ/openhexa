@@ -147,10 +147,12 @@ jobs:
             openhexa/smoke-tests http://localhost:3000/ root@openhexa.org "$SUPERUSER_PASSWORD"
 
       - name: Keep test results
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: Smoke tests results
-          path: smoke-test-results/
+          path: test-results/
+          if-no-files-found: ignore
 
 
       - name: Stop OpenHexa
