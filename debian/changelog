@@ -1,3 +1,14 @@
+openhexa (5.17.0-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.17.0
+  * Features across 5.13.0–5.17.0: Data Studio saved queries, CSV export,
+    SQL formatting and autocomplete, SQL query auditing (QueryLog),
+    workspace tags, workspace tokens in account settings, AI agent
+    workspace description context, dataset copying in workspace duplication
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Mon, 31 Aug 2026 13:30:40 +0000
+
 openhexa (5.12.0-2) stable; urgency=medium
 
   [ Bram Jans ]
