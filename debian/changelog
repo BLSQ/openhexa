@@ -1,3 +1,12 @@
+openhexa (5.18.0-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.18.0
+  * Data Studio map widget, bucket CORS backfill, workspace copier
+    improvements, AI naming agent fix
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Tue, 08 Sep 2026 08:35:17 +0000
+
 openhexa (5.17.0-1) stable; urgency=medium
 
   [ blsqbot ]
