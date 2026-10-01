@@ -35,6 +35,36 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.19.0
+
+Covers upgrades from 5.18.0.
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# Per-agent model overrides for managed organizations (ASSISTANT_MANAGED=true).
+# JSON map of agent keys to models; a "default" key covers unnamed agents.
+# Has no effect when ASSISTANT_MANAGED is false (self-hosted / BYOK).
+ASSISTANT_MANAGED_AGENT_MODELS=
+
+# Prices (USD/Mtok) for models genai_prices does not know, so usage still
+# counts towards ASSISTANT_MONTHLY_LIMIT. Managed organizations only.
+ASSISTANT_MODEL_PRICES=
+```
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading: besides the Django migrations
+(saved queries versioning, pipeline DAG, token usage logging, webapp
+write-permission deprecation), it runs the new
+`backfill_saved_query_repositories` command, which creates a git repository
+for each existing saved query and commits its current SQL as the first
+version. The command is idempotent; queries it misses get their repository on
+their next edit.
+
 ## 5.17.0
 
 Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).

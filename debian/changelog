@@ -1,3 +1,18 @@
+openhexa (5.19.0-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.19.0
+  * New ENV vars in .env.dist: ASSISTANT_MANAGED_AGENT_MODELS (per-agent model
+    overrides for managed organizations) and ASSISTANT_MODEL_PRICES (custom
+    model pricing for token usage tracking)
+  * Features: saved queries versioning and management tools, pipeline DAG
+    visualization, more flexible AI agent providers, editing agents can make
+    commits, token usage logging
+  * `openhexa.sh prepare` now runs `backfill_saved_query_repositories` to
+    create git repositories for pre-existing saved queries
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Thu, 01 Oct 2026 09:35:49 +0000
+
 openhexa (5.18.0-1) stable; urgency=medium
 
   [ blsqbot ]
