@@ -47,6 +47,10 @@ the Django app, `frontend/` the NextJS app).
    - any `.env` / `.env.dist` template files
    - `docker-compose*` files (new services, new internal wiring)
    - Dockerfiles / entrypoints (command or port changes)
+   - **added** `backend/**/management/commands/*.py` files (new one-off
+     commands such as backfills); also grep the release notes, migrations,
+     and app READMEs for "backfill" / "manage.py" — migrations often defer
+     data work to a command (see `backfill_saved_query_repositories` in 5.19.0)
 
 Extract four things:
 
@@ -59,7 +63,11 @@ Extract four things:
    `script/openhexa.sh` (backup/restore), `script/common_functions.sh`
    (env plumbing). Check each against the `ed43e25..5ca8171` reference diff.
 3. **Breaking changes and one-off migration commands** → UPGRADING.md
-   material.
+   material. For each new management command an upgrade needs, read its
+   source/docs: if it is idempotent, add it to the `prepare)` case in
+   `script/openhexa.sh` (after `sync_git_repositories`, with a
+   `# idempotent, …` comment) so the post-install hook runs it; otherwise
+   document it as a manual step only.
 4. **Companion image requirements**: if release notes require a newer
    `blsq/openhexa-base-environment` or `blsq/openhexa-jupyterhub`, **flag it
    to the user but do not bump those tags** — Renovate owns them. Only the
@@ -127,6 +135,8 @@ changes, or manual migration steps. Follow the existing structure:
 `## <version>` with `### New environment variables` (a copy-pasteable
 `bash` block matching `.env.dist` defaults), `### Breaking changes`, and
 `### Manual steps`. A routine bump with no manual steps needs no entry.
+Under `### Manual steps`, name every command `prepare` newly runs and what
+it does (see the 5.17.0 and 5.19.0 entries).
 
 **README.md** — update the two version example strings (the version
 convention example under "Release, changelog, and versions" and the
