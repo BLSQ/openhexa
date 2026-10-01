@@ -57,9 +57,13 @@ ASSISTANT_MODEL_PRICES=
 
 ### Manual steps
 
-Run `openhexa.sh prepare` after upgrading to apply the Django migrations
-introduced in 5.19.0 (saved queries versioning, pipeline DAG, token usage
-logging, webapp write-permission deprecation).
+Run `openhexa.sh prepare` after upgrading: besides the Django migrations
+(saved queries versioning, pipeline DAG, token usage logging, webapp
+write-permission deprecation), it runs the new
+`backfill_saved_query_repositories` command, which creates a git repository
+for each existing saved query and commits its current SQL as the first
+version. The command is idempotent; queries it misses get their repository on
+their next edit.
 
 ## 5.17.0
 
