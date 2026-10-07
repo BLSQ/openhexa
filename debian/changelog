@@ -1,3 +1,15 @@
+openhexa (5.19.1-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.19.1
+  * Saved queries versioning and MCP management tools, flexible AI
+    agent providers, pipeline DAG visualization, editing agents with
+    commits, naming agent simpler model, token usage logging
+  * Bug fixes: dataset version tab persistence, DAG view zoom cap,
+    HTML run output buttons, pipeline scheduling without default params
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Wed, 07 Oct 2026 07:40:03 +0000
+
 openhexa (5.18.0-1) stable; urgency=medium
 
   [ blsqbot ]
