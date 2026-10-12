@@ -35,6 +35,32 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.19.2
+
+Covers upgrades from 5.18.0 (includes 5.19.0 and 5.19.1 changes).
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# JSON map of agents to models for managed organizations. Overrides each
+# agent's default model. This env var doesn't affect BYOK organizations.
+ASSISTANT_MANAGED_AGENT_MODELS=
+
+# Prices of models the genai_prices library does not know, so their usage
+# still counts towards ASSISTANT_MONTHLY_LIMIT. This env var doesn't affect
+# BYOK organizations.
+ASSISTANT_MODEL_PRICES=
+```
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading to apply the Django migrations
+introduced across the 5.19.x series (saved query versioning, pipeline DAG,
+workspace token usage tracking).
+
 ## 5.17.0
 
 Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).

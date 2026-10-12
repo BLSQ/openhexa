@@ -1,3 +1,18 @@
+openhexa (5.19.2-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.19.2
+  * New ENV vars in .env.dist: ASSISTANT_MANAGED_AGENT_MODELS (per-agent
+    model override for managed organizations) and ASSISTANT_MODEL_PRICES
+    (custom model pricing for usage tracking)
+  * Notable upstream features: saved queries tooling and versioning,
+    flexible AI agent providers, editing agents can make commits,
+    pipeline DAG visualization, token usage logging
+  * Bug fixes: webapp access for 2-FA users, dataset version tabs,
+    DAG view zoom cap, HTML run outputs display
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Mon, 12 Oct 2026 13:02:07 +0000
+
 openhexa (5.18.0-1) stable; urgency=medium
 
   [ blsqbot ]
