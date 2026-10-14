@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:5.18.0"
+    image: "blsq/openhexa-app:5.20.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -59,7 +59,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:5.18.0"
+    image: "blsq/openhexa-frontend:5.20.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -115,6 +115,13 @@ services:
       timeout: "1s"
       start_period: "15s"
       retries: 3
+
+  workspace_copy_worker:
+    <<: *common
+    command: "manage workspace_copy_worker"
+    restart: unless-stopped
+    profiles:
+      - "workspace_copy_worker"
 
   jupyter:
     image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.17.11}
