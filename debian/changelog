@@ -1,3 +1,18 @@
+openhexa (5.20.1-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.20.1
+  * Features across 5.19.0–5.20.1: saved queries versioning and
+    pagination, pipeline DAG visualization, AI assistant webapp
+    creation, flexible AI agent providers, workspace copier with
+    database copying and async jobs, granular MCP tool permissions,
+    revised webapps scopes
+  * New environment variables in .env.dist:
+    ASSISTANT_MANAGED_AGENT_MODELS, ASSISTANT_MODEL_PRICES,
+    LOGFIRE_TOKEN (previously commented out)
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Tue, 20 Oct 2026 11:30:40 +0000
+
 openhexa (5.18.0-1) stable; urgency=medium
 
   [ blsqbot ]
