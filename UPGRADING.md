@@ -35,6 +35,36 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.20.2
+
+Covers upgrades from 5.18.0 (includes 5.19.x and 5.20.x changes).
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# JSON map of agent key to model for managed organizations, overriding
+# each agent's default. Does not affect BYOK organizations.
+ASSISTANT_MANAGED_AGENT_MODELS=
+
+# Prices (USD/million tokens) of models the genai_prices library does not
+# know. Does not affect BYOK organizations.
+ASSISTANT_MODEL_PRICES=
+
+# Logfire token for AI agent observability (previously commented out).
+# Required when LOGFIRE_SEND_TO_LOGFIRE=true.
+LOGFIRE_TOKEN=
+```
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading to apply the Django migrations
+introduced across the 5.19–5.20 series (saved queries versioning, pipeline
+DAG, workspace copier database copying, webapps scopes, MCP granular
+permissions).
+
 ## 5.17.0
 
 Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).
