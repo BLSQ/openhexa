@@ -12,6 +12,9 @@ openhexa (5.20.2-1) stable; urgency=medium
     LOGFIRE_TOKEN (uncommented)
   * `openhexa.sh prepare` now runs `backfill_saved_query_repositories` to
     create git repositories for pre-existing saved queries
+  * Fix long-standing issue: add the missing `dataset_worker` service
+    (enabled by default), so dataset file previews and column metadata
+    are generated instead of staying on "Processing" forever
 
  -- blsqbot <blsqbot@users.noreply.github.com>  Wed, 21 Oct 2026 12:41:38 +0000
 

@@ -68,6 +68,17 @@ which creates a git repository for each existing saved query and commits its
 current SQL as the first version. The command is idempotent; queries it misses
 get their repository on their next edit.
 
+### New services
+
+This package now starts the `dataset_worker` service by default. It was always
+part of upstream OpenHEXA but missing from this packaging, so dataset file
+previews and column metadata were never generated on self-hosted installs and
+stayed on "Processing". It is one more always-on app container; nothing else
+to configure. The metadata jobs queued by every earlier upload are still in the
+database, so the worker drains that backlog on its first start and existing
+files get their preview without any manual step. This can take a while on an
+instance with many large dataset files.
+
 ## 5.17.0
 
 Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).
