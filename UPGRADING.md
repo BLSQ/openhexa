@@ -41,14 +41,7 @@ Covers upgrades from 5.18.0 (includes 5.19.x and 5.20.x changes).
 
 ### New environment variables
 
-Append the variables you are missing to your `.env` (the defaults in this list
-match `.env.dist`).
-
-```bash
-# Logfire token for AI agent observability (previously commented out).
-# Required when LOGFIRE_SEND_TO_LOGFIRE=true.
-LOGFIRE_TOKEN=
-```
+None.
 
 ### Manual steps
 
