@@ -117,6 +117,7 @@ function run_compose_with_profiles() {
     --profile pipelines \
     --profile notebook \
     --profile dataset_worker \
+    --profile workspace_copy_worker \
     $@
 }
 

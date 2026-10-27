@@ -133,6 +133,21 @@ services:
       start_period: "15s"
       retries: 3
 
+  # Executes workspace copies queued from the Django admin (async since
+  # OpenHEXA 5.20.0). Without it a queued copy never runs.
+  workspace_copy_worker:
+    <<: *common
+    command: "manage workspace_copy_worker"
+    restart: unless-stopped
+    profiles:
+      - "workspace_copy_worker"
+    healthcheck:
+      test: \[ $(ps -p $(pgrep "python") -o etimes | tail -n +2) -gt 14 \]
+      interval: "60s"
+      timeout: "1s"
+      start_period: "15s"
+      retries: 3
+
   jupyter:
     image: ${DEFAULT_WORKSPACE_IMAGE:-blsq/openhexa-base-environment:1.17.11}
     platform: linux/amd64

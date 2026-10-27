@@ -79,6 +79,11 @@ database, so the worker drains that backlog on its first start and existing
 files get their preview without any manual step. This can take a while on an
 instance with many large dataset files.
 
+It also starts the new `workspace_copy_worker` service by default. Since
+OpenHEXA 5.20.0 a workspace copy started from the Django admin is queued and
+executed by this worker instead of running inline; without it the copy would
+stay queued forever. It is only used by superusers through the Django admin.
+
 ## 5.17.0
 
 Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).
