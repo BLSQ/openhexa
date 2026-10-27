@@ -7,9 +7,7 @@ openhexa (5.20.2-1) stable; urgency=medium
     pipeline DAG visualization, web app creation with assistant,
     database copying in workspace copier, granular MCP permissions,
     revised webapps scopes, async workspace copy
-  * New environment variables in .env.dist:
-    ASSISTANT_MANAGED_AGENT_MODELS, ASSISTANT_MODEL_PRICES,
-    LOGFIRE_TOKEN (uncommented)
+  * LOGFIRE_TOKEN is now listed (uncommented) in .env.dist
   * `openhexa.sh prepare` now runs `backfill_saved_query_repositories` to
     create git repositories for pre-existing saved queries
   * Fix long-standing issue: add the missing `dataset_worker` service

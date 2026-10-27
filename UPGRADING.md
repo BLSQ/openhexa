@@ -45,14 +45,6 @@ Append the variables you are missing to your `.env` (the defaults in this list
 match `.env.dist`).
 
 ```bash
-# JSON map of agent key to model for managed organizations, overriding
-# each agent's default. Does not affect BYOK organizations.
-ASSISTANT_MANAGED_AGENT_MODELS=
-
-# Prices (USD/million tokens) of models the genai_prices library does not
-# know. Does not affect BYOK organizations.
-ASSISTANT_MODEL_PRICES=
-
 # Logfire token for AI agent observability (previously commented out).
 # Required when LOGFIRE_SEND_TO_LOGFIRE=true.
 LOGFIRE_TOKEN=

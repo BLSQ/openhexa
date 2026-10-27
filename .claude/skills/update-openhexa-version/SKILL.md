@@ -57,6 +57,12 @@ Extract four things:
 1. **New, renamed, or removed ENV vars** → must land in `.env.dist`
    (user-facing config) and/or the `x-app` `environment:` block in
    `compose.yml` (internal Docker-network wiring like service URLs).
+   **Except SaaS-only vars**: anything that only takes effect with
+   `ASSISTANT_MANAGED=true` (e.g. `VERTEX_*`, `ASSISTANT_MANAGED_AGENT_MODELS`,
+   `ASSISTANT_MODEL_PRICES`) or that serves a Bluesquare-hosted feature
+   (e.g. the Django SQL dashboards credentials, removed in b454e68) is left
+   out of `.env.dist`, UPGRADING.md and the changelog entirely. Check how
+   `backend/config/settings/` gates each new var before adding it.
 2. **New infrastructure** (like Forgejo in 5.0.0) → a new `compose.yml`
    service. Be aware this cascades: `debian/install` (ship new files),
    `.gitignore`, `script/setup.sh` (data dirs, generated secrets),
@@ -98,7 +104,8 @@ Add new *user-facing* vars in the existing convention:
   adding one implies a matching generation change in `script/setup.sh`.
 
 `openhexa.sh env-check` diffs a user's `.env` against `.env.dist`, so
-`.env.dist` must be complete: every var the new release reads belongs here.
+`.env.dist` must be complete: every var the new release reads on a local
+hosting belongs here. SaaS-only vars (see Step 1) do not.
 
 ## Step 4 — debian/changelog
 
