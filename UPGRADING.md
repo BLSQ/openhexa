@@ -70,19 +70,13 @@ get their repository on their next edit.
 
 ### New services
 
-This package now starts the `dataset_worker` service by default. It was always
-part of upstream OpenHEXA but missing from this packaging, so dataset file
-previews and column metadata were never generated on self-hosted installs and
-stayed on "Processing". It is one more always-on app container; nothing else
-to configure. The metadata jobs queued by every earlier upload are still in the
-database, so the worker drains that backlog on its first start and existing
-files get their preview without any manual step. This can take a while on an
-instance with many large dataset files.
+Two app containers now start by default, nothing to configure:
 
-It also starts the new `workspace_copy_worker` service by default. Since
-OpenHEXA 5.20.0 a workspace copy started from the Django admin is queued and
-executed by this worker instead of running inline; without it the copy would
-stay queued forever. It is only used by superusers through the Django admin.
+- `dataset_worker`: generates dataset file previews and column metadata. It
+  was missing from this packaging, so previews stayed on "Processing". The
+  backlog of earlier uploads is processed on first start.
+- `workspace_copy_worker`: runs workspace copies queued from the Django admin
+  (async since 5.20.0).
 
 ## 5.17.0
 
