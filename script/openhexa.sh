@@ -500,6 +500,8 @@ function execute() {
     run_compose_with_profiles run app python manage.py sync_git_orgs
     echo -n "Sync git repositories" # idempotent, backfill branch protection + proxy write access
     run_compose_with_profiles run app python manage.py sync_git_repositories
+    echo -n "Backfill saved query repositories" # idempotent, version history for pre-existing saved queries
+    run_compose_with_profiles run app python manage.py backfill_saved_query_repositories
     echo -n "Run jupyterhub upgrade-db"
     run_compose_with_profiles run jupyterhub jupyterhub upgrade-db -f /etc/jupyterhub/jupyterhub_dev_config.py
     exit_properly 0

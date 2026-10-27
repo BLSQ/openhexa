@@ -60,10 +60,13 @@ LOGFIRE_TOKEN=
 
 ### Manual steps
 
-Run `openhexa.sh prepare` after upgrading to apply the Django migrations
+Run `openhexa.sh prepare` after upgrading: besides the Django migrations
 introduced across the 5.19–5.20 series (saved queries versioning, pipeline
 DAG, workspace copier database copying, webapps scopes, MCP granular
-permissions).
+permissions), it runs the new `backfill_saved_query_repositories` command,
+which creates a git repository for each existing saved query and commits its
+current SQL as the first version. The command is idempotent; queries it misses
+get their repository on their next edit.
 
 ## 5.17.0
 

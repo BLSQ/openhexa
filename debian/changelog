@@ -10,6 +10,8 @@ openhexa (5.20.2-1) stable; urgency=medium
   * New environment variables in .env.dist:
     ASSISTANT_MANAGED_AGENT_MODELS, ASSISTANT_MODEL_PRICES,
     LOGFIRE_TOKEN (uncommented)
+  * `openhexa.sh prepare` now runs `backfill_saved_query_repositories` to
+    create git repositories for pre-existing saved queries
 
  -- blsqbot <blsqbot@users.noreply.github.com>  Wed, 21 Oct 2026 12:41:38 +0000
 
