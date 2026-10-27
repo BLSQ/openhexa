@@ -57,12 +57,27 @@ Extract four things:
 1. **New, renamed, or removed ENV vars** → must land in `.env.dist`
    (user-facing config) and/or the `x-app` `environment:` block in
    `compose.yml` (internal Docker-network wiring like service URLs).
-   **Except SaaS-only vars**: anything that only takes effect with
-   `ASSISTANT_MANAGED=true` (e.g. `VERTEX_*`, `ASSISTANT_MANAGED_AGENT_MODELS`,
-   `ASSISTANT_MODEL_PRICES`) or that serves a Bluesquare-hosted feature
-   (e.g. the Django SQL dashboards credentials, removed in b454e68) is left
-   out of `.env.dist`, UPGRADING.md and the changelog entirely. Check how
-   `backend/config/settings/` gates each new var before adding it.
+   **Not every var upstream reads belongs here.** For each new var, read
+   how `backend/config/settings/` and its consumers use it and answer one
+   question: *can a local hosting ever need a non-default value?* If not,
+   the var is **SaaS-only** and is left out of `.env.dist`, UPGRADING.md
+   and the changelog entirely. "Django reads it unconditionally" and
+   "added for completeness" are not reasons to include it — upstream
+   defaults cover the absent case. Signs of a SaaS-only var:
+   - it only takes effect behind a flag local hostings keep off, above all
+     `ASSISTANT_MANAGED=true` (managed AI: `VERTEX_*`,
+     `ASSISTANT_MANAGED_AGENT_MODELS`, `ASSISTANT_MODEL_PRICES`);
+   - the settings comment says so ("True on our SaaS instance", "managed
+     organizations only", "BYOK is not affected");
+   - it serves a feature only Bluesquare operates or reaches, such as the
+     Django SQL dashboards credentials (removed in b454e68), billing,
+     fleet-wide analytics or internal tooling.
+   When in doubt, leave it out and list it under "flagged but not done" in
+   the report so the reviewer decides. Adding a var later is cheap; every
+   var shipped shows up in `env-check` for every self-hoster.
+   Also leave pre-existing vars alone: a bump never uncomments, reorders or
+   reformats a var that was already in `.env.dist` (e.g. `LOGFIRE_TOKEN`),
+   since that reads as a new requirement to someone upgrading.
 2. **New infrastructure** (like Forgejo in 5.0.0) → a new `compose.yml`
    service. Be aware this cascades: `debian/install` (ship new files),
    `.gitignore`, `script/setup.sh` (data dirs, generated secrets),
@@ -104,8 +119,9 @@ Add new *user-facing* vars in the existing convention:
   adding one implies a matching generation change in `script/setup.sh`.
 
 `openhexa.sh env-check` diffs a user's `.env` against `.env.dist`, so
-`.env.dist` must be complete: every var the new release reads on a local
-hosting belongs here. SaaS-only vars (see Step 1) do not.
+`.env.dist` must be complete for a local hosting: every var a self-hoster
+may need to set belongs here, and nothing else. SaaS-only vars (Step 1)
+never do, even with an empty default.
 
 ## Step 4 — debian/changelog
 
@@ -140,7 +156,8 @@ openhexa (<TARGET>-1) stable; urgency=medium
 (newest first) whenever the release introduces new env vars, breaking
 changes, or manual migration steps. Follow the existing structure:
 `## <version>` with `### New environment variables` (a copy-pasteable
-`bash` block matching `.env.dist` defaults), `### Breaking changes`, and
+`bash` block matching `.env.dist` defaults, or `None.` when the release adds
+vars but all are SaaS-only — see 5.17.0), `### Breaking changes`, and
 `### Manual steps`. A routine bump with no manual steps needs no entry.
 Under `### Manual steps`, name every command `prepare` newly runs and what
 it does (see the 5.17.0 and 5.19.0 entries).
@@ -160,7 +177,8 @@ introduced (see the "Forgejo Git server" section as the model).
   UPGRADING.md history), nowhere load-bearing.
 - Report to the user: the upstream findings summary, every file edited and
   why, anything flagged but not done (companion images, script cascades
-  needing their own testing). Leave the changes uncommitted for review;
+  needing their own testing, and every new upstream var left out as
+  SaaS-only, with the one-line reason). Leave the changes uncommitted for review;
   remind them that pushing to `main` builds, smoke-tests, and publishes
   the APT repo via GitHub Actions.
 
