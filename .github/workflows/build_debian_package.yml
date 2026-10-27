@@ -13,7 +13,7 @@ jobs:
     name: Build Debian package
     runs-on: ubuntu-latest
     container:
-      image: debian:bookworm
+      image: debian:trixie
 
     steps:
       - name: Update APT database
