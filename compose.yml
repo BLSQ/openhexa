@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:5.18.0"
+    image: "blsq/openhexa-app:5.20.2"
     platform: linux/amd64
     networks:
       - openhexa
@@ -59,7 +59,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:5.18.0"
+    image: "blsq/openhexa-frontend:5.20.2"
     platform: linux/amd64
     networks:
       - openhexa
@@ -109,6 +109,38 @@ services:
     restart: unless-stopped
     profiles:
       - "pipelines"
+    healthcheck:
+      test: \[ $(ps -p $(pgrep "python") -o etimes | tail -n +2) -gt 14 \]
+      interval: "60s"
+      timeout: "1s"
+      start_period: "15s"
+      retries: 3
+
+  # Consumes the dataset file metadata queue: every uploaded dataset file
+  # (CSV, Excel, Parquet) gets its sample preview and column metadata from
+  # this worker. Upstream has shipped it for a long time; it was missing here,
+  # so previews stayed on "Processing" forever on self-hosted installs.
+  dataset_worker:
+    <<: *common
+    command: "manage dataset_worker"
+    restart: unless-stopped
+    profiles:
+      - "dataset_worker"
+    healthcheck:
+      test: \[ $(ps -p $(pgrep "python") -o etimes | tail -n +2) -gt 14 \]
+      interval: "60s"
+      timeout: "1s"
+      start_period: "15s"
+      retries: 3
+
+  # Executes workspace copies queued from the Django admin (async since
+  # OpenHEXA 5.20.0). Without it a queued copy never runs.
+  workspace_copy_worker:
+    <<: *common
+    command: "manage workspace_copy_worker"
+    restart: unless-stopped
+    profiles:
+      - "workspace_copy_worker"
     healthcheck:
       test: \[ $(ps -p $(pgrep "python") -o etimes | tail -n +2) -gt 14 \]
       interval: "60s"

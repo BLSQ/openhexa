@@ -35,6 +35,34 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.20.2
+
+Covers upgrades from 5.18.0 (includes 5.19.x and 5.20.x changes).
+
+### New environment variables
+
+None.
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading: besides the Django migrations
+introduced across the 5.19–5.20 series (saved queries versioning, pipeline
+DAG, workspace copier database copying, webapps scopes, MCP granular
+permissions), it runs the new `backfill_saved_query_repositories` command,
+which creates a git repository for each existing saved query and commits its
+current SQL as the first version. The command is idempotent; queries it misses
+get their repository on their next edit.
+
+### New services
+
+Two app containers now start by default, nothing to configure:
+
+- `dataset_worker`: generates dataset file previews and column metadata. It
+  was missing from this packaging, so previews stayed on "Processing". The
+  backlog of earlier uploads is processed on first start.
+- `workspace_copy_worker`: runs workspace copies queued from the Django admin
+  (async since 5.20.0).
+
 ## 5.17.0
 
 Covers upgrades from 5.12.0 (includes 5.13.x, 5.14.0, 5.15.0, 5.16.x changes).

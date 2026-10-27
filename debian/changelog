@@ -1,3 +1,22 @@
+openhexa (5.20.2-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.20.2
+  * Features across 5.19.0–5.20.2: saved queries versioning and
+    pagination, flexible AI providers, editing agents commits,
+    pipeline DAG visualization, web app creation with assistant,
+    database copying in workspace copier, granular MCP permissions,
+    revised webapps scopes, async workspace copy
+  * `openhexa.sh prepare` now runs `backfill_saved_query_repositories` to
+    create git repositories for pre-existing saved queries
+  * Fix long-standing issue: add the missing `dataset_worker` service
+    (enabled by default), so dataset file previews and column metadata
+    are generated instead of staying on "Processing" forever
+  * Add the `workspace_copy_worker` service (enabled by default) that
+    runs workspace copies queued from the Django admin since 5.20.0
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Wed, 21 Oct 2026 12:41:38 +0000
+
 openhexa (5.18.0-1) stable; urgency=medium
 
   [ blsqbot ]
