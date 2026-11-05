@@ -1,3 +1,15 @@
+openhexa (5.21.0-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.21.0
+  * Web app copying in workspace duplication, template parameters in saved
+    queries, dataset public slugs, confirmation before making web apps public,
+    MapLibre nudge, surgical file reading tools for AI assistant
+  * Forgejo now allows internal domain migrations (workspace copier web app
+    cloning)
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Thu, 05 Nov 2026 08:27:35 +0000
+
 openhexa (5.20.2-1) stable; urgency=medium
 
   [ blsqbot ]
