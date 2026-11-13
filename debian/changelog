@@ -1,3 +1,19 @@
+openhexa (5.22.0-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.22.0
+  * Features across 5.21.0–5.22.0: webapp duplication in workspace copier,
+    saved query template parameters, dataset public slugs, pipeline run
+    profiling (flamegraph), public datasets/saved queries/workspace files,
+    data studio cache policy, invitation language selection, login
+    brute-force protection (django-axes), MCP permission fixes
+  * New env var PUBLIC_FILES_ENABLED (default false): opt-in to serve
+    the "public" folder of workspaces without authentication
+  * Add FORGEJO__migrations__ALLOWED_DOMAINS to the forgejo service so
+    the workspace copier can clone webapp repositories within the server
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Fri, 13 Nov 2026 16:23:48 +0000
+
 openhexa (5.20.2-1) stable; urgency=medium
 
   [ blsqbot ]
