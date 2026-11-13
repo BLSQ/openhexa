@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:5.20.2"
+    image: "blsq/openhexa-app:5.22.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -59,7 +59,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:5.20.2"
+    image: "blsq/openhexa-frontend:5.22.0"
     platform: linux/amd64
     networks:
       - openhexa
@@ -236,6 +236,8 @@ services:
       FORGEJO__server__LANDING_PAGE: explore
       FORGEJO__service__DISABLE_REGISTRATION: "true"
       FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      # Lets the workspace copier clone web app repositories within this server.
+      FORGEJO__migrations__ALLOWED_DOMAINS: forgejo
     volumes:
       - "${FORGEJO_STORAGE_LOCATION}:/data"
       - ${FORGEJO_ENTRYPOINT_PATH:-./forgejo/entrypoint.sh}:/custom-entrypoint.sh:ro
