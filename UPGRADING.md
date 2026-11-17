@@ -35,6 +35,29 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 
 ---
 
+## 5.22.2
+
+Covers upgrades from 5.20.2 (includes 5.21.x and 5.22.x changes).
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# Serve files from the "public" root folder of opted-in workspaces without
+# authentication. Off by default so existing buckets with a top-level "public"
+# folder are never exposed without an explicit opt-in.
+PUBLIC_FILES_ENABLED=false
+```
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading to apply the Django migrations
+introduced across the 5.21–5.22 series (public saved queries, public datasets,
+public workspace files, pipeline profiling, invitation language, login rate
+limiting).
+
 ## 5.20.2
 
 Covers upgrades from 5.18.0 (includes 5.19.x and 5.20.x changes).
