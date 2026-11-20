@@ -179,9 +179,6 @@ services:
       HUB_DB_URL: postgresql://${JUPYTERHUB_DATABASE_USER:-hexa-hub}:${JUPYTERHUB_DATABASE_PASSWORD:-hexa-hub}@host.docker.internal:${DATABASE_PORT:-5432}/${JUPYTERHUB_DATABASE_NAME:-hexa-hub}
       # The URI to authenticate by the backend through the local Docker network
       AUTHENTICATION_URL: http://app:8000/notebooks/authenticate/
-      # The URI to get the default credentials by the backend through the local
-      # Docker network
-      DEFAULT_CREDENTIALS_URL: http://app:8000/notebooks/default-credentials/
       # The URI to get the workspace credentials by the backend through the
       # local Docker network
       WORKSPACE_CREDENTIALS_URL: http://app:8000/workspaces/credentials/
