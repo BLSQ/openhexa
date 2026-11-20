@@ -15,6 +15,8 @@ openhexa (5.22.2-1) stable; urgency=medium
     folder without authentication)
   * Add FORGEJO__migrations__ALLOWED_DOMAINS to let the workspace copier
     clone web app repositories within the Forgejo server
+  * Remove ASSISTANT_MONTHLY_LIMIT from .env.dist: no longer read
+    upstream, the AI budget is now managed per organization in-app
 
  -- blsqbot <blsqbot@users.noreply.github.com>  Tue, 17 Nov 2026 10:23:15 +0000
 

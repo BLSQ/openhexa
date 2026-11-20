@@ -51,6 +51,12 @@ match `.env.dist`).
 PUBLIC_FILES_ENABLED=false
 ```
 
+### Removed environment variables
+
+`ASSISTANT_MONTHLY_LIMIT` is no longer read by OpenHEXA: the AI assistant
+budget is now managed per organization in the application. You can delete it
+from your `.env`; leaving it in place is harmless.
+
 ### Manual steps
 
 Run `openhexa.sh prepare` after upgrading to apply the Django migrations
@@ -182,8 +188,6 @@ WORKSPACE_STORAGE_BACKEND_AWS_ROLE_ARN=
 # Datasets: max files snapshotted per dataset version (previews)
 WORKSPACE_DATASETS_FILE_SNAPSHOT_SIZE=50
 
-# AI assistant: monthly request cap per workspace
-ASSISTANT_MONTHLY_LIMIT=200
 # Optional Pydantic Logfire integration for AI agent observability
 LOGFIRE_SEND_TO_LOGFIRE=false
 
