@@ -213,7 +213,7 @@ services:
   # Forgejo provides the Git server backing OpenHEXA static webapps.
   # The `app` service requires it to be reachable at http://forgejo:3000.
   forgejo:
-    image: codeberg.org/forgejo/forgejo:14.0.5
+    image: codeberg.org/forgejo/forgejo:17.0.2
     platform: linux/amd64
     container_name: forgejo
     networks:
