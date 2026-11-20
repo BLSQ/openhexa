@@ -157,7 +157,7 @@ services:
 
   jupyterhub:
     platform: linux/amd64
-    image: blsq/openhexa-jupyterhub:local-2025.04.09
+    image: blsq/openhexa-jupyterhub:local-3.0.1
     command: ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_dev_config.py"]
     container_name: jupyterhub
     networks:
