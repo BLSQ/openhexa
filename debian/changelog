@@ -7,7 +7,9 @@ openhexa (5.22.2-1) stable; urgency=medium
     run profiling with flamegraph, Data Studio cache policy, invitation
     language selection, login brute-force protection (django-axes),
     webapp duplication in workspace copier, template parameters in
-    saved queries
+    saved queries, dataset public slugs, confirmation before making
+    web apps public, MapLibre nudge for webapps, AI assistant file
+    reading tools and pipeline run inspection, MCP permission fixes
   * New environment variable in .env.dist: PUBLIC_FILES_ENABLED (off by
     default; opt-in per workspace to serve files from the "public"
     folder without authentication)

@@ -54,8 +54,9 @@ PUBLIC_FILES_ENABLED=false
 ### Manual steps
 
 Run `openhexa.sh prepare` after upgrading to apply the Django migrations
-introduced across the 5.21–5.22 series (public saved queries, public datasets,
-public workspace files, pipeline profiling, invitation language, login rate
+introduced across the 5.21–5.22 series (dataset public slugs and visibility,
+saved query parameters and public visibility, public workspace files, pipeline
+profiling, invitation language, MCP organization connections, login rate
 limiting).
 
 ## 5.20.2
