@@ -250,7 +250,7 @@ jobs:
           fi
 
           # Git refs can't hold ':' or '~', which Debian versions may (DEP-14 mapping).
-          TAG="v$(printf '%s' "$VERSION" | tr ':~' '%_')"
+          TAG="$(printf '%s' "$VERSION" | tr ':~' '%_')"
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists, nothing to do." >> "$GITHUB_STEP_SUMMARY"
