@@ -408,7 +408,7 @@ OVERRIDE_WORKSPACES_DATABASE_HOST="<LOCAL-IP>"
 
 Since OpenHEXA 5.0.0, the Static Webapps feature is backed by a Forgejo Git
 server that runs as a sibling container. The package ships a `forgejo`
-service (image `codeberg.org/forgejo/forgejo:14`) and a custom entrypoint
+service (image `codeberg.org/forgejo/forgejo:15.0.12`, the LTS series) and a custom entrypoint
 at `/usr/share/openhexa/forgejo/entrypoint.sh` that creates the admin user
 on first boot.
 

@@ -6,8 +6,14 @@ variables, breaking changes, and one-off migration commands.
 
 ## General upgrade procedure
 
+> **Take a backup before every upgrade.** Database migrations (OpenHEXA and
+> Forgejo) cannot be rolled back: if an upgrade goes wrong, restoring a backup
+> is the only way to return to the previous version.
+
 ```bash
 sudo systemctl stop openhexa
+# Back up the database, workspace files, Forgejo data and .env:
+sudo /usr/share/openhexa/openhexa.sh -g backup
 sudo apt update && sudo apt install --only-upgrade openhexa
 # Pull the new app/frontend images (and any new possible images):
 sudo /usr/share/openhexa/openhexa.sh -g update
@@ -56,6 +62,23 @@ PUBLIC_FILES_ENABLED=false
 `ASSISTANT_MONTHLY_LIMIT` is no longer read by OpenHEXA: the AI assistant
 budget is now managed per organization in the application. You can delete it
 from your `.env`; leaving it in place is harmless.
+
+### Forgejo 15 (LTS)
+
+The bundled Forgejo Git server moves from 14.0.5 (end of life) to 15.0.12
+(LTS). Forgejo migrates its database on first start and **cannot be
+downgraded** afterwards: going back means restoring `FORGEJO_STORAGE_LOCATION`
+from a backup. Take one before upgrading, while OpenHEXA is stopped:
+
+```bash
+sudo systemctl stop openhexa
+sudo /usr/share/openhexa/openhexa.sh -g backup
+# or, without a configured backup location:
+sudo cp -a "$FORGEJO_STORAGE_LOCATION" "$FORGEJO_STORAGE_LOCATION-pre-15"
+```
+
+No configuration change is needed. Anyone signed in to the Forgejo web UI
+(port `FORGEJO_PORT`) has to sign in again.
 
 ### Manual steps
 

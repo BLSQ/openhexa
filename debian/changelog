@@ -17,6 +17,9 @@ openhexa (5.22.2-1) stable; urgency=high
   * Remove ASSISTANT_MONTHLY_LIMIT from .env.dist: no longer read
     upstream, the AI budget is now managed per organization in-app
   * Update blsq/openhexa-jupyterhub to local-3.0.1 (JupyterHub 5.5.4)
+  * Update Forgejo from 14.0.5 (end of life) to 15.0.12 (LTS, supported
+    until July 2027). The database is migrated on first start and cannot
+    be downgraded: back up before upgrading
 
  -- blsqbot <blsqbot@users.noreply.github.com>  Tue, 17 Nov 2026 10:23:15 +0000
 
