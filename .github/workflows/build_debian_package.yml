@@ -214,3 +214,59 @@ jobs:
           echo 'curl -sfLo /etc/apt.trusted.gpg.d/${{ needs.build.outputs.keyring }}.asc ${{ steps.deploy-pages.outputs.page_url }}gpg.key' >> $GITHUB_STEP_SUMMARY
           echo 'echo "deb ${{ steps.deploy-pages.outputs.page_url }} ${{ env.CODENAME }} ${{ env.COMPONENTS }}" >/etc/apt/sources.list.d/${{ env.REPO_NAME }}.list' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Tags the commit and publishes a GitHub release with the .deb attached, once
+  # per package version: pushes to main that don't bump debian/changelog find
+  # the release already there and skip.
+  release:
+    name: Create GitHub release
+    permissions:
+      contents: write
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    needs: deploy_apt_repo
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Retrieve package
+        if: ${{ ! env.ACT }}
+        uses: actions/download-artifact@v8
+        with:
+          name: debian_package_amd64
+
+      - name: Create release for the packaged version
+        if: ${{ ! env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # First changelog line looks like: openhexa (5.22.2-1) stable; urgency=high
+          VERSION=$(sed -n '1s/^[^(]*(\([^)]*\)).*$/\1/p' debian/changelog)
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not read the package version from debian/changelog"
+            exit 1
+          fi
+
+          # Git refs can't hold ':' or '~', which Debian versions may (DEP-14 mapping).
+          TAG="v$(printf '%s' "$VERSION" | tr ':~' '%_')"
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Release notes: the body of the top changelog stanza, without its
+          # header and its " -- maintainer  date" trailer.
+          awk 'NR == 1 { next } /^ -- / { exit } { print }' debian/changelog \
+            | sed 's/^  //' > "$RUNNER_TEMP/release-notes.md"
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "OpenHEXA $VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            openhexa_*_amd64.deb
+
+          echo "Published release $TAG." >> "$GITHUB_STEP_SUMMARY"
