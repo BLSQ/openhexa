@@ -265,7 +265,7 @@ jobs:
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "OpenHEXA $VERSION" \
+            --title "$VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             openhexa_*_amd64.deb
 
