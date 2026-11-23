@@ -6,8 +6,14 @@ variables, breaking changes, and one-off migration commands.
 
 ## General upgrade procedure
 
+> **Take a backup before every upgrade.** Database migrations (OpenHEXA and
+> Forgejo) cannot be rolled back: if an upgrade goes wrong, restoring a backup
+> is the only way to return to the previous version.
+
 ```bash
 sudo systemctl stop openhexa
+# Back up the database, workspace files, Forgejo data and .env:
+sudo /usr/share/openhexa/openhexa.sh -g backup
 sudo apt update && sudo apt install --only-upgrade openhexa
 # Pull the new app/frontend images (and any new possible images):
 sudo /usr/share/openhexa/openhexa.sh -g update
@@ -34,6 +40,52 @@ sudo /usr/share/openhexa/openhexa.sh -g env-check /path/to/.env
 ```
 
 ---
+
+## 5.22.2
+
+Covers upgrades from 5.20.2 (includes 5.21.x and 5.22.x changes).
+
+### New environment variables
+
+Append the variables you are missing to your `.env` (the defaults in this list
+match `.env.dist`).
+
+```bash
+# Serve files from the "public" root folder of opted-in workspaces without
+# authentication. Off by default so existing buckets with a top-level "public"
+# folder are never exposed without an explicit opt-in.
+PUBLIC_FILES_ENABLED=false
+```
+
+### Removed environment variables
+
+`ASSISTANT_MONTHLY_LIMIT` is no longer read by OpenHEXA: the AI assistant
+budget is now managed per organization in the application. You can delete it
+from your `.env`; leaving it in place is harmless.
+
+### Forgejo 15 (LTS)
+
+The bundled Forgejo Git server moves from 14.0.5 (end of life) to 15.0.12
+(LTS). Forgejo migrates its database on first start and **cannot be
+downgraded** afterwards: going back means restoring `FORGEJO_STORAGE_LOCATION`
+from a backup. Take one before upgrading, while OpenHEXA is stopped:
+
+```bash
+sudo systemctl stop openhexa
+sudo /usr/share/openhexa/openhexa.sh -g backup
+# or, without a configured backup location:
+sudo cp -a "$FORGEJO_STORAGE_LOCATION" "$FORGEJO_STORAGE_LOCATION-pre-15"
+```
+
+No configuration change is needed. Anyone signed in to the Forgejo web UI
+(port `FORGEJO_PORT`) has to sign in again.
+
+### Manual steps
+
+Run `openhexa.sh prepare` after upgrading to apply the Django migrations
+introduced across the 5.21–5.22 series (dataset public slugs and visibility,
+saved query parameters and public visibility, public workspace files, pipeline
+profiling, invitation language, MCP organization connections).
 
 ## 5.20.2
 
@@ -158,8 +210,6 @@ WORKSPACE_STORAGE_BACKEND_AWS_ROLE_ARN=
 # Datasets: max files snapshotted per dataset version (previews)
 WORKSPACE_DATASETS_FILE_SNAPSHOT_SIZE=50
 
-# AI assistant: monthly request cap per workspace
-ASSISTANT_MONTHLY_LIMIT=200
 # Optional Pydantic Logfire integration for AI agent observability
 LOGFIRE_SEND_TO_LOGFIRE=false
 

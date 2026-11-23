@@ -3,7 +3,7 @@
 # Do not change it without good reaons.
 
 x-app: &common
-    image: "blsq/openhexa-app:5.20.2"
+    image: "blsq/openhexa-app:5.22.2"
     platform: linux/amd64
     networks:
       - openhexa
@@ -59,7 +59,7 @@ services:
       retries: 3
 
   frontend:
-    image: "blsq/openhexa-frontend:5.20.2"
+    image: "blsq/openhexa-frontend:5.22.2"
     platform: linux/amd64
     networks:
       - openhexa
@@ -157,7 +157,7 @@ services:
 
   jupyterhub:
     platform: linux/amd64
-    image: blsq/openhexa-jupyterhub:local-2025.04.09
+    image: blsq/openhexa-jupyterhub:local-3.0.2
     command: ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_dev_config.py"]
     container_name: jupyterhub
     networks:
@@ -179,9 +179,6 @@ services:
       HUB_DB_URL: postgresql://${JUPYTERHUB_DATABASE_USER:-hexa-hub}:${JUPYTERHUB_DATABASE_PASSWORD:-hexa-hub}@host.docker.internal:${DATABASE_PORT:-5432}/${JUPYTERHUB_DATABASE_NAME:-hexa-hub}
       # The URI to authenticate by the backend through the local Docker network
       AUTHENTICATION_URL: http://app:8000/notebooks/authenticate/
-      # The URI to get the default credentials by the backend through the local
-      # Docker network
-      DEFAULT_CREDENTIALS_URL: http://app:8000/notebooks/default-credentials/
       # The URI to get the workspace credentials by the backend through the
       # local Docker network
       WORKSPACE_CREDENTIALS_URL: http://app:8000/workspaces/credentials/
@@ -213,7 +210,7 @@ services:
   # Forgejo provides the Git server backing OpenHEXA static webapps.
   # The `app` service requires it to be reachable at http://forgejo:3000.
   forgejo:
-    image: codeberg.org/forgejo/forgejo:14.0.5
+    image: codeberg.org/forgejo/forgejo:15.0.12
     platform: linux/amd64
     container_name: forgejo
     networks:
@@ -236,6 +233,8 @@ services:
       FORGEJO__server__LANDING_PAGE: explore
       FORGEJO__service__DISABLE_REGISTRATION: "true"
       FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      # Lets the workspace copier clone web app repositories within this server.
+      FORGEJO__migrations__ALLOWED_DOMAINS: forgejo
     volumes:
       - "${FORGEJO_STORAGE_LOCATION}:/data"
       - ${FORGEJO_ENTRYPOINT_PATH:-./forgejo/entrypoint.sh}:/custom-entrypoint.sh:ro
