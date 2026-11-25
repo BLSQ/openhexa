@@ -119,7 +119,9 @@ function is_frontend_reachable() {
 }
 
 function is_backend_reachable() {
-  (($(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ready) == 200))
+  # Asked as `app`, a host name the backend always accepts: behind a reverse
+  # proxy (PROXY_HOSTNAME_AND_PORT) it refuses requests made to `localhost`.
+  (($(curl -s -o /dev/null -w "%{http_code}" -H "Host: app" http://localhost:8000/ready) == 200))
 }
 
 function is_forgejo_reachable() {
