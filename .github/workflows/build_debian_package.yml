@@ -244,12 +244,18 @@ jobs:
         env:
           CI: true
           PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
         run: |
           EXCLUDED=$(grep -vE '^(#|$)' "$GITHUB_WORKSPACE/e2e/excluded-tests.txt" | paste -sd '|')
           npx playwright test \
             --grep-invert "$EXCLUDED" \
-            --reporter=github,list,html \
+            --reporter=github,list,html,json \
             --trace retain-on-failure
+
+      - name: Summarize the e2e results
+        if: always()
+        run: |
+          e2e/summary.sh openhexa-app/e2e/results.json "${{ matrix.scenario }}" e2e/excluded-tests.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the e2e report
         if: always()
