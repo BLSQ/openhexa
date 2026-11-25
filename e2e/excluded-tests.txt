@@ -19,6 +19,3 @@ a running run streams its messages and can be stopped
 
 # A new install has no pipeline template to create a pipeline from.
 workspace-pipelines\.spec
-
-# Not in OpenHEXA 5.22.2 yet: /pipelines/ and /notebooks/ still are pages.
-the retired top-level pages lead to the workspaces
