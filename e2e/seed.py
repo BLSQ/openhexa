@@ -1,11 +1,11 @@
-# Prepares a new install for the openhexa-app e2e suite: an organization and a
-# workspace, owned by the account the suite signs in as. Used by the `e2e` job
+# Prepares a new install for the openhexa-app e2e suite: the account it signs
+# in as, and an organization and a workspace owned by it. Used by the `e2e` job
 # of .github/workflows/build_debian_package.yml, on an install that is thrown
 # away afterwards, so it is not meant to be run twice.
 #
 # It runs inside the backend and takes everything from the environment:
 #
-#   docker exec -i -e E2E_EMAIL -e E2E_ORGANIZATION_NAME \
+#   docker exec -i -e E2E_EMAIL -e E2E_PASSWORD -e E2E_ORGANIZATION_NAME \
 #     -e E2E_ORGANIZATION_SHORT_NAME -e E2E_WORKSPACE_NAME \
 #     app python manage.py shell < e2e/seed.py
 #
@@ -23,7 +23,10 @@ from hexa.user_management.models import (
 )
 from hexa.workspaces.models import Workspace
 
-user = User.objects.get(email=os.environ["E2E_EMAIL"])
+# An ordinary account rather than the superuser, which sees every organization.
+user = User.objects.create_user(
+    email=os.environ["E2E_EMAIL"], password=os.environ["E2E_PASSWORD"]
+)
 
 organization = Organization.objects.create(
     name=os.environ["E2E_ORGANIZATION_NAME"],

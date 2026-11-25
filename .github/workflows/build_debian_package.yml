@@ -175,8 +175,8 @@ jobs:
         scenario: [upgrade, fresh]
     env:
       E2E_BASE_URL: http://localhost:3000
-      E2E_EMAIL: root@openhexa.org
       # Created by e2e/seed.py, then looked for by the suite
+      E2E_EMAIL: e2e@example.org
       E2E_ORGANIZATION_NAME: E2E Testing
       E2E_ORGANIZATION_SHORT_NAME: E2E
       E2E_WORKSPACE_NAME: E2E Workspace
@@ -184,9 +184,6 @@ jobs:
       E2E_SERVER_CONFIGURATION_AI_ENABLED: "false"
       E2E_SERVER_CONFIGURATION_SELF_REGISTRATION_ENABLED: "false"
       E2E_SERVER_CONFIGURATION_SUBSCRIPTION_CONSOLE_ENABLED: "false"
-      # Specs left out: static web apps are served on a subdomain, which needs
-      # WEBAPPS_DOMAIN and a wildcard DNS.
-      E2E_EXCLUDED_SPECS: workspace-static-webapps\.spec
       # Branches of openhexa-app to take the suite from while no release has
       # it yet, in order of preference.
       E2E_FALLBACK_REFS: main chore-e2e-capabilities
@@ -223,6 +220,16 @@ jobs:
         if: matrix.scenario == 'fresh'
         run: sudo dpkg -i openhexa_*_amd64.deb
 
+      # What README.md asks of every install: the workspaces' databases are
+      # reached at the address of the server, here the one Docker gives it.
+      - name: Configure OpenHexa
+        run: |
+          set -euo pipefail
+          HOST=$(docker network inspect --format='{{(index .IPAM.Config 0).Gateway}}' bridge)
+          sudo sed -i "s|^OVERRIDE_WORKSPACES_DATABASE_HOST=.*|OVERRIDE_WORKSPACES_DATABASE_HOST=${HOST}|" /etc/openhexa/env.conf
+          sudo grep '^OVERRIDE_WORKSPACES_DATABASE_HOST=' /etc/openhexa/env.conf
+          sudo systemctl restart openhexa
+
       - name: Get OpenHexa status
         run: /usr/share/openhexa/openhexa.sh -g status
 
@@ -253,19 +260,21 @@ jobs:
           sparse-checkout: e2e
           persist-credentials: false
 
-      # Creates the organization and the workspace the suite works in, owned
-      # by the superuser, then loads the tables it reads.
+      # Creates the account the suite signs in as, the organization and the
+      # workspace it works in, then loads the tables it reads.
       - name: Seed the test data
         run: |
           set -euo pipefail
-          SEEDED=$(docker exec -i -e E2E_EMAIL -e E2E_ORGANIZATION_NAME \
+          E2E_PASSWORD=$(openssl rand -hex 16)
+          echo "::add-mask::${E2E_PASSWORD}"
+          echo "E2E_PASSWORD=${E2E_PASSWORD}" >> "$GITHUB_ENV"
+          export E2E_PASSWORD
+          SEEDED=$(docker exec -i -e E2E_EMAIL -e E2E_PASSWORD -e E2E_ORGANIZATION_NAME \
             -e E2E_ORGANIZATION_SHORT_NAME -e E2E_WORKSPACE_NAME \
             app python manage.py shell < e2e/seed.py)
           # Where the suite finds what was created
           printf '%s\n' "$SEEDED" | grep -E '^E2E_(ORGANIZATION_ID|WORKSPACE_SLUG)=' | tee -a "$GITHUB_ENV"
-          # The URL is the one the containers use: from here it is on localhost.
-          DB_PORT=$(sudo grep -E '^DATABASE_PORT=' /etc/openhexa/env.conf | cut -d= -f2- | tr -d '"')
-          DB_URL=$(printf '%s\n' "$SEEDED" | sed -n 's/^WORKSPACE_DATABASE_URL=//p' | sed -E "s#@[^/]+/#@localhost:${DB_PORT}/#")
+          DB_URL=$(printf '%s\n' "$SEEDED" | sed -n 's/^WORKSPACE_DATABASE_URL=//p')
           psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f openhexa-app/e2e/seed/seed-tables.sql
 
       # The procedure of UPGRADING.md, with the package built by this run.
@@ -301,16 +310,16 @@ jobs:
 
       # Unlike in openhexa-app, the report and the traces are kept: the only
       # password they hold is the one of an install that ends with this job.
+      # e2e/excluded-tests.txt lists what is left out, and why.
       - name: Run the e2e suite
         working-directory: openhexa-app/e2e
         env:
           CI: true
           PLAYWRIGHT_HTML_OPEN: never
         run: |
-          E2E_PASSWORD=$(sudo grep -E '^DJANGO_SUPERUSER_PASSWORD=' /etc/openhexa/env.conf | cut -d= -f2-)
-          export E2E_PASSWORD
+          EXCLUDED=$(grep -vE '^(#|$)' "$GITHUB_WORKSPACE/e2e/excluded-tests.txt" | paste -sd '|')
           npx playwright test \
-            --grep-invert "$E2E_EXCLUDED_SPECS" \
+            --grep-invert "$EXCLUDED" \
             --reporter=github,list,html \
             --trace retain-on-failure
 

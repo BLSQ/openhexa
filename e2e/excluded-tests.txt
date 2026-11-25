@@ -1,0 +1,22 @@
+# Tests of the openhexa-app e2e suite that the `e2e` job leaves out, one
+# regular expression per line, matched against "file › describe › test".
+# Each one needs something an install made by this job does not have.
+
+# Web apps are only offered with WEBAPPS_DOMAIN, which needs a wildcard DNS.
+workspace-static-webapps\.spec
+workspace-webapps\.spec
+workspace-webapp-assistant\.spec
+the sidebar leads to every section
+
+# No mail server: an invitation cannot be sent.
+an invitation is sent, resent and deleted
+
+# Without a public hostname, a webhook's URL is the backend's address on the
+# Docker network, which nothing outside of it can call.
+its webhook starts a run
+
+# A new install has no pipeline template to create a pipeline from.
+a pipeline can be created from a template and deleted
+
+# Not in OpenHEXA 5.22.2 yet: /pipelines/ and /notebooks/ still are pages.
+the retired top-level pages lead to the workspaces
