@@ -176,6 +176,10 @@ jobs:
     env:
       E2E_BASE_URL: http://localhost:3000
       E2E_EMAIL: root@openhexa.org
+      # Created by e2e/seed.py, then looked for by the suite
+      E2E_ORGANIZATION_NAME: E2E Testing
+      E2E_ORGANIZATION_SHORT_NAME: E2E
+      E2E_WORKSPACE_NAME: E2E Workspace
       # What a packaged install does not have, see openhexa-app/e2e/README.md
       E2E_SERVER_CONFIGURATION_AI_ENABLED: "false"
       E2E_SERVER_CONFIGURATION_SELF_REGISTRATION_ENABLED: "false"
@@ -223,21 +227,21 @@ jobs:
         run: /usr/share/openhexa/openhexa.sh -g status
 
       # The suite is taken at the version of the app being packaged, so that it
-      # matches the app under test. A release from before the suite could be
-      # seeded falls back to a branch.
+      # matches the app under test. A release from before the suite could run
+      # on a packaged install falls back to a branch.
       - name: Pick the version of the e2e suite
         id: suite
         run: |
           set -euo pipefail
           APP_VERSION=$(yq '.x-app.image' compose.yml | cut -d: -f2)
           for ref in "$APP_VERSION" $E2E_FALLBACK_REFS; do
-            if curl -fsSIo /dev/null "https://raw.githubusercontent.com/BLSQ/openhexa-app/${ref}/e2e/seed/seed.py"; then
+            if curl -fsSIo /dev/null "https://raw.githubusercontent.com/BLSQ/openhexa-app/${ref}/e2e/seed/seed-tables.sql"; then
               echo "ref=${ref}" >> "$GITHUB_OUTPUT"
               echo "E2E suite from openhexa-app at \`${ref}\` (app ${APP_VERSION})." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
           done
-          echo "::error::no e2e suite with a seed script at ${APP_VERSION} ${E2E_FALLBACK_REFS}"
+          echo "::error::no e2e suite with its sample tables at ${APP_VERSION} ${E2E_FALLBACK_REFS}"
           exit 1
 
       - name: Checkout the e2e suite
@@ -249,20 +253,19 @@ jobs:
           sparse-checkout: e2e
           persist-credentials: false
 
-      # Creates the organization and the workspace the suite works in, with
-      # the superuser as their owner, then loads the tables it reads.
+      # Creates the organization and the workspace the suite works in, owned
+      # by the superuser, then loads the tables it reads.
       - name: Seed the test data
         run: |
           set -euo pipefail
-          DB_PORT=$(sudo grep -E '^DATABASE_PORT=' /etc/openhexa/env.conf | cut -d= -f2- | tr -d '"')
-          DB_URL=$(docker exec -i -e E2E_EMAIL app python manage.py shell < openhexa-app/e2e/seed/seed.py \
-            | sed -n 's/^WORKSPACE_DATABASE_URL=//p')
-          if [ -z "$DB_URL" ]; then
-            echo "::error::the seed script did not give the workspace's database"
-            exit 1
-          fi
+          SEEDED=$(docker exec -i -e E2E_EMAIL -e E2E_ORGANIZATION_NAME \
+            -e E2E_ORGANIZATION_SHORT_NAME -e E2E_WORKSPACE_NAME \
+            app python manage.py shell < e2e/seed.py)
+          # Where the suite finds what was created
+          printf '%s\n' "$SEEDED" | grep -E '^E2E_(ORGANIZATION_ID|WORKSPACE_SLUG)=' | tee -a "$GITHUB_ENV"
           # The URL is the one the containers use: from here it is on localhost.
-          DB_URL=$(printf '%s' "$DB_URL" | sed -E "s#@[^/]+/#@localhost:${DB_PORT}/#")
+          DB_PORT=$(sudo grep -E '^DATABASE_PORT=' /etc/openhexa/env.conf | cut -d= -f2- | tr -d '"')
+          DB_URL=$(printf '%s\n' "$SEEDED" | sed -n 's/^WORKSPACE_DATABASE_URL=//p' | sed -E "s#@[^/]+/#@localhost:${DB_PORT}/#")
           psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f openhexa-app/e2e/seed/seed-tables.sql
 
       # The procedure of UPGRADING.md, with the package built by this run.
