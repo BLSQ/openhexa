@@ -118,13 +118,20 @@ jobs:
           /usr/share/openhexa/setup.sh -g check
 
       # What README.md asks of every install: the workspaces' databases are
-      # reached at the address of the server, here the one Docker gives it.
+      # reached at the address of the server, here the one Docker gives it,
+      # and a mail server, here one that keeps the mail it is given.
       - name: Configure OpenHexa
         run: |
           set -euo pipefail
+          docker run -d --name mailpit --network openhexa --restart unless-stopped axllent/mailpit:v1.20
           HOST=$(docker network inspect --format='{{(index .IPAM.Config 0).Gateway}}' bridge)
-          sudo sed -i "s|^OVERRIDE_WORKSPACES_DATABASE_HOST=.*|OVERRIDE_WORKSPACES_DATABASE_HOST=${HOST}|" /etc/openhexa/env.conf
-          sudo grep '^OVERRIDE_WORKSPACES_DATABASE_HOST=' /etc/openhexa/env.conf
+          sudo sed -i \
+            -e "s|^OVERRIDE_WORKSPACES_DATABASE_HOST=.*|OVERRIDE_WORKSPACES_DATABASE_HOST=${HOST}|" \
+            -e "s|^EMAIL_HOST=.*|EMAIL_HOST=mailpit|" \
+            -e "s|^EMAIL_PORT=.*|EMAIL_PORT=1025|" \
+            -e "s|^DEFAULT_FROM_EMAIL=.*|DEFAULT_FROM_EMAIL=openhexa@example.org|" \
+            /etc/openhexa/env.conf
+          sudo grep -E '^(OVERRIDE_WORKSPACES_DATABASE_HOST|EMAIL_HOST|EMAIL_PORT|DEFAULT_FROM_EMAIL)=' /etc/openhexa/env.conf
           sudo systemctl restart openhexa
 
       - name: Get OpenHexa status

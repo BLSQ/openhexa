@@ -8,9 +8,6 @@ workspace-webapps\.spec
 workspace-webapp-assistant\.spec
 the sidebar leads to every section
 
-# No mail server: an invitation cannot be sent.
-an invitation is sent, resent and deleted
-
 # Without a proxy in front, the browser is given the backend's address on the
 # Docker network (http://app:8000), which it cannot reach: a webhook's URL, and
 # the stream of a run's messages while it runs.
