@@ -216,10 +216,7 @@ jobs:
           PLAYWRIGHT_HTML_OPEN: never
         run: |
           EXCLUDED=$(grep -vE '^(#|$)' "$GITHUB_WORKSPACE/e2e/excluded-tests.txt" | paste -sd '|')
-          # More workers than the suite allows itself on an environment it
-          # shares: this install is its own.
           npx playwright test \
-            --workers=4 \
             --grep-invert "$EXCLUDED" \
             --reporter=github,list,html \
             --trace retain-on-failure
