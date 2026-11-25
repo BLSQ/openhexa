@@ -145,9 +145,15 @@ jobs:
 
           sudo systemctl restart openhexa nginx
 
+      # The released package's status check does not know about a proxy yet,
+      # so it is left to the new one: here on a fresh install, and after the
+      # upgrade otherwise.
       - name: Get OpenHexa status
+        if: matrix.scenario == 'fresh'
+        run: /usr/share/openhexa/openhexa.sh -g status
+
+      - name: Check OpenHexa answers through NGINX
         run: |
-          /usr/share/openhexa/openhexa.sh -g status
           getent hosts "${E2E_HOSTNAME}" "e2e.webapps.${E2E_HOSTNAME}" || true
           curl -fsS -o /dev/null -w "NGINX answers %{http_code} at %{url_effective}\n" "${E2E_BASE_URL}/login"
 
