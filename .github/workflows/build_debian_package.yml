@@ -141,6 +141,9 @@ jobs:
 
           sed "s/example\.com/${E2E_HOSTNAME}/g" nginx/openhexa.conf | sudo tee /etc/nginx/sites-available/openhexa > /dev/null
           sudo ln -s /etc/nginx/sites-available/openhexa /etc/nginx/sites-enabled/
+          # A .localhost name is ::1 first, where only NGINX's default site
+          # listens and answers 404: without it, clients go on to 127.0.0.1.
+          sudo rm -f /etc/nginx/sites-enabled/default
           sudo nginx -t
 
           sudo systemctl restart openhexa nginx
