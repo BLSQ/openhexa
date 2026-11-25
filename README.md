@@ -480,7 +480,8 @@ on two runners: one installs the released package from our APT repository and
 upgrades it to the new one, the other installs the new one on a clean machine.
 The suite is taken at the version of the app being packaged (the
 `blsq/openhexa-app` tag in `compose.yml`); `e2e/seed.py` creates the account,
-organization and workspace it works in, and its sample tables are loaded.
+organization, workspace and pipeline template it works with, and its sample
+tables are loaded.
 `e2e/excluded-tests.txt` lists the tests left out, and why. The APT repository
 is only updated when both pass. The report of each run, with a trace of every
 failed test, is kept as an artifact of the workflow run.

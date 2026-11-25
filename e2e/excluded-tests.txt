@@ -16,6 +16,3 @@ an invitation is sent, resent and deleted
 # the stream of a run's messages while it runs.
 its webhook starts a run
 a running run streams its messages and can be stopped
-
-# A new install has no pipeline template to create a pipeline from.
-workspace-pipelines\.spec
