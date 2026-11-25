@@ -9,7 +9,7 @@ This repo packages OpenHEXA (app + frontend + JupyterHub + Forgejo) as a Debian
 package. A version bump means: research what changed upstream, propagate it to
 the packaging files, and write the release changelog. Follow the steps in
 order. **Stop at working-tree changes — never commit or push.** Pushing to
-`main` triggers CI to build, smoke-test, and publish the APT repo, so the user
+`main` triggers CI to build, test, and publish the APT repo, so the user
 reviews and commits themselves. (The one exception is an automated CI run —
 see "Running in CI" at the end.)
 
@@ -179,7 +179,7 @@ introduced (see the "Forgejo Git server" section as the model).
   why, anything flagged but not done (companion images, script cascades
   needing their own testing, and every new upstream var left out as
   SaaS-only, with the one-line reason). Leave the changes uncommitted for review;
-  remind them that pushing to `main` builds, smoke-tests, and publishes
+  remind them that pushing to `main` builds, tests, and publishes
   the APT repo via GitHub Actions.
 
 ## Running in CI

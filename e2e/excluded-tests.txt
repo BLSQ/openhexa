@@ -1,0 +1,13 @@
+# Tests of the openhexa-app e2e suite that the `e2e` job leaves out, one
+# regular expression per line, matched against "file › describe › test".
+# Each one needs something an install made by this job does not have.
+
+# The browser is given the backend's address on the Docker network
+# (http://app:8000), which it cannot reach, even behind NGINX: a webhook's URL,
+# and the stream of a run's messages while it runs.
+its webhook starts a run
+a running run streams its messages and can be stopped
+
+# Marked in the suite as failing until a bug is fixed, which takes a second
+# cookie on the parent domain: under .localhost it passes, and so is reported.
+a client is authorized by a browser holding a second CSRF cookie

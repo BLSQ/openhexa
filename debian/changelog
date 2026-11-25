@@ -1,3 +1,13 @@
+openhexa (5.22.2-2) stable; urgency=medium
+
+  [ Bram Jans ]
+  * Ship the NGINX site configurations in /usr/share/openhexa/nginx
+    (HTTP and HTTPS), with the account page and uploads over 1 MB
+    served through the proxy
+  * Fix `openhexa.sh status` when the backend sits behind a proxy
+
+ -- Bram Jans <ik@bramjans.com>  Wed, 25 Nov 2026 20:30:00 +0100
+
 openhexa (5.22.2-1) stable; urgency=high
 
   [ blsqbot ]

@@ -465,23 +465,38 @@ These are documented per version, newest first, in [UPGRADING.md](./UPGRADING.md
 
 #### Test
 
-To test if OpenHexa has been correctly installed, you can run smoke tests that
-will check minimum operation. To learn how to do so, please read its
-[dedicated README](./smoke-tests/README.md).
+To test if OpenHexa has been correctly installed, you can run the
+[end-to-end suite of openhexa-app](https://github.com/BLSQ/openhexa-app/tree/main/e2e)
+against it, as our CI does (see below).
 
 #### CI
 
-We use Github Actions to automate the package building and its tests. If you
-want to run our workflows locally, you can use [`act`](https://nektosact.com/)
-as it follows:
+We use Github Actions to automate the package building and its tests, on every
+pull request and on `main`.
+
+Once the package is built, the `e2e` job installs it and runs the
+[end-to-end suite of openhexa-app](https://github.com/BLSQ/openhexa-app/tree/main/e2e)
+on two runners: one installs the released package from our APT repository and
+upgrades it to the new one, the other installs the new one on a clean machine.
+Both publish it through NGINX with `nginx/openhexa.conf`, as described
+[below](#publish-openhexa-through-a-nginx-proxy).
+The suite is taken at the version of the app being packaged (the
+`blsq/openhexa-app` tag in `compose.yml`); `e2e/seed.py` creates the account,
+organization, workspace and pipeline template it works with, and its sample
+tables are loaded.
+`e2e/excluded-tests.txt` lists the tests left out, and why. The APT repository
+is only updated when both pass. The report of each run, with a trace of every
+failed test, is kept as an artifact of the workflow run.
+
+If you want to build the package locally the way the workflow does, you can use
+[`act`](https://nektosact.com/):
 
 ```bash
-act --action-offline-mode push
+act --action-offline-mode --job package pull_request
 ```
 
-Warning: Make sure to remove your local `.env` before running it as `act` copies your working copy rather than using the checking out action. When it
-happens, it overrides other environment files that are provided to the compose
-project, which is used to configure it (`/etc/openhexa/env.conf`).
+Warning: Make sure to remove your local `.env` before running it as `act` copies
+your working copy rather than using the checking out action.
 
 ##### The storage engine
 
@@ -503,64 +518,13 @@ The following requires you the following:
 - a domain name for which you manage the zone,
 - the NGINX service,
 
-Create a file `/etc/nginx/sites-available/openhexa` with the following content
-(replace `example.com` with your domain name):
+The package installs a site configuration,
+[`/usr/share/openhexa/nginx/openhexa.conf`](./nginx/openhexa.conf). Copy it to
+`/etc/nginx/sites-available/openhexa` with `example.com` replaced by your domain
+name:
 
-```
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    ''      close;
-}
-
-server {
-    listen 80;
-    server_name example.com;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    location ~ ^/(?<root_path>hub|user)(?<path>/.*)? {
-        rewrite ^ /$root_path$path break;
-        proxy_pass http://localhost:8001;
-
-        # websocket headers
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-        proxy_set_header X-Scheme $scheme;
-
-        proxy_buffering off;
-    }
-
-    # Static Webapps auth-token endpoint is served by the backend (app),
-    # not the frontend, so route it directly to the backend port.
-    location /webapps/ {
-        proxy_pass http://localhost:8000;
-    }
-
-
-    location / {
-        proxy_pass http://localhost:3000;
-    }
-
-}
-
-# Support for webapps wildcard host:
-# Route all *.webapps.example.com subdomains (e.g. my-app.webapps.example.com) to the backend on port 8000.
-server {
-    listen 80;
-    client_max_body_size 500M;
-    server_name *.webapps.example.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+```bash
+sed 's/example\.com/your.domain.name/g' /usr/share/openhexa/nginx/openhexa.conf | sudo tee /etc/nginx/sites-available/openhexa
 ```
 
 Enable and check it:
@@ -589,101 +553,16 @@ sudo systemctl restart openhexa nginx
 
 You can browse now OpenHexa app at `http://example.com`.
 
+Our CI publishes OpenHexa this way, with this very file, before it runs the
+end-to-end suite (see [CI](#ci)).
+
 ##### With TLS/SSL
 
-Additionnaly, you need a certificate. The way it has been retrieved is up to the reader. For the rest, follow the same playbook, except to use the following
-config
-
-in `/etc/nginx/sites-available/openhexa`:
-
-```
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    ''      close;
-}
-
-server {
-    listen 80;
-    server_name example.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name example.com;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
-    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
-    ssl_protocols TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers EECDH+AESGCM:EDH+AESGCM;
-    ssl_ecdh_curve secp384r1;
-    ssl_session_timeout  10m;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_tickets off;
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
-    add_header X-Frame-Options SAMEORIGIN;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-
-    location ~ ^/(?<root_path>hub|user)(?<path>/.*)? {
-        rewrite ^ /$root_path$path break;
-        proxy_pass http://localhost:8001;
-
-        # websocket headers
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-        proxy_set_header X-Scheme $scheme;
-
-        proxy_buffering off;
-    }
-
-    # Static Webapps auth-token endpoint is served by the backend (app),
-    # not the frontend, so route it directly to the backend port.
-    location /webapps/ {
-        proxy_pass http://localhost:8000;
-    }
-
-
-    location / {
-        proxy_pass http://localhost:3000;
-    }
-
-}
-
-# Support for webapps wildcard host:
-# Route all *.webapps.example.com subdomains (e.g. my-app.webapps.example.com) to the backend on port 8000.
-server {
-    client_max_body_size 500M;
-    server_name *.webapps.example.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    listen 443 ssl;
-    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
-    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
-}
-
-
-server {
-    listen 80;
-    server_name *.webapps.example.com;
-    return 301 https://$host$request_uri;
-}
-```
-
-and in `/etc/openhexa/env.conf`
+Additionnaly, you need a certificate. The way it has been retrieved is up to the
+reader. For the rest, follow the same playbook, except to use
+[`/usr/share/openhexa/nginx/openhexa-tls.conf`](./nginx/openhexa-tls.conf), which
+expects the certificate and its key in `/etc/ssl/certs/nginx-selfsigned.crt` and
+`/etc/ssl/private/nginx-selfsigned.key`, and in `/etc/openhexa/env.conf`
 
 ```bash
 TRUST_FORWARDED_PROTO="true"

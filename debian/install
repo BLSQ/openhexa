@@ -6,3 +6,5 @@ script/common_functions.sh /usr/share/openhexa
 forgejo/entrypoint.sh usr/share/openhexa/forgejo
 git-proxy/entrypoint.sh usr/share/openhexa/git-proxy
 git-proxy/git-proxy.conf.template usr/share/openhexa/git-proxy
+nginx/openhexa.conf usr/share/openhexa/nginx
+nginx/openhexa-tls.conf usr/share/openhexa/nginx

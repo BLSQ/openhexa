@@ -1,6 +1,10 @@
 name: build_debian_package
 run-name: ${{ github.actor }} is packaging for Debian
-on: [push]
+# On pull requests and on main, where it also publishes the package.
+on:
+  pull_request:
+  push:
+    branches: [main]
 
 env:
   REPO_NAME: openhexa
@@ -49,121 +53,243 @@ jobs:
           name: debian_package_amd64
           path: openhexa_*_amd64.deb
 
-  install:
-    name: Install Debian package
-    needs:
-      - package
+  # Installs the package and runs the openhexa-app e2e suite against it, on
+  # two throwaway runners: one upgrades the released package to the new one,
+  # the other installs the new one on a clean machine.
+  e2e:
+    name: E2E suite (${{ matrix.scenario }})
+    needs: package
     runs-on: ubuntu-latest
-    # Unfortunately, the postgresql running in the job container can't bind
-    # the docker0 interface as it is not mounted inside the job container.
-    # container:
-    #   image: debian:bookworm
-    #   options: '--privileged'
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [upgrade, fresh]
+    env:
+      # Published through NGINX as README.md describes. Any name under
+      # .localhost is the machine itself, so it needs no DNS.
+      E2E_HOSTNAME: openhexa.localhost
+      E2E_BASE_URL: http://openhexa.localhost
+      # Created by e2e/seed.py, then looked for by the suite
+      E2E_EMAIL: e2e@example.org
+      E2E_ORGANIZATION_NAME: E2E Testing
+      E2E_ORGANIZATION_SHORT_NAME: E2E
+      E2E_WORKSPACE_NAME: E2E Workspace
+      # What a packaged install does not have, see openhexa-app/e2e/README.md
+      E2E_SERVER_CONFIGURATION_AI_ENABLED: "false"
+      E2E_SERVER_CONFIGURATION_SELF_REGISTRATION_ENABLED: "false"
+      E2E_SERVER_CONFIGURATION_SUBSCRIPTION_CONSOLE_ENABLED: "false"
+      # Branches of openhexa-app to take the suite from while no release has
+      # it yet, in order of preference.
+      E2E_FALLBACK_REFS: main chore-e2e-capabilities
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
-      - name: Update APT database
-        run: sudo apt update
-
-      - name: Install curl and CA certificates
-        run: sudo apt install -y --no-install-recommends curl ca-certificates
-
-      # this is for job container
-      # - name: Hack container for local development
-      #   if: ${{ env.ACT }}
-      #   run: |
-      #     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo su -p -c bash -
-      #     sudo apt install -y nodejs npm
-      #     curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-      #     sudo sh /tmp/get-docker.sh
 
       - name: Retrieve package
         uses: actions/download-artifact@v8
         with:
           name: debian_package_amd64
 
-      # on Debian bookworkm we can simply install postgresql-postgis, but
-      # because it triggers a restart of another package, we need to be more
-      # specific
       - name: Install OpenHexa dependencies
         run: |
-          sudo apt install -y --no-install-recommends gettext-base openssl postgresql postgresql-postgis
+          sudo apt update
+          sudo apt install -y --no-install-recommends curl ca-certificates gettext-base openssl postgresql postgresql-postgis nginx
           curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq &&\
               sudo mv /tmp/yq /usr/bin/yq &&\
               sudo chmod +x /usr/bin/yq
-
-      - name: Start PostgreSQL if run locally
-        if: ${{ env.ACT }}
-        run: |
-          sudo /etc/init.d/postgresql restart
-      - name: Start PostgreSQL if run on GitHub runner
-        if: ${{ ! env.ACT }}
-        run: |
           sudo systemctl restart postgresql
 
-      - name: Install OpenHexa
+      # The way a new user installs it: from the signed public APT repo.
+      - name: Install the released OpenHexa
+        if: matrix.scenario == 'upgrade'
         run: |
-          sudo dpkg -i openhexa_*_amd64.deb
+          sudo gpg --yes --dearmor --output /usr/share/keyrings/openhexa.gpg < pubkey.gpg
+          echo "deb [signed-by=/usr/share/keyrings/openhexa.gpg] https://viz.bluesquare.org/openhexa/ ${CODENAME} ${COMPONENTS}" | sudo tee /etc/apt/sources.list.d/openhexa.list
+          sudo apt update
+          sudo apt install -y --no-install-recommends openhexa
+          dpkg-query -W openhexa
 
-      - name: Check OpenHexa status
+      - name: Install the new OpenHexa
+        if: matrix.scenario == 'fresh'
+        run: sudo dpkg -i openhexa_*_amd64.deb
+
+      - name: Check OpenHexa installation
         run: |
           sudo systemctl status openhexa.service
           /usr/share/openhexa/setup.sh -g check
 
-      - name: Check OpenHexa logs
+      # What README.md asks of an install: the workspaces' databases reached
+      # at the address of the server (here the one Docker gives it), a mail
+      # server (here one that keeps the mail it is given), and NGINX in front,
+      # with a domain for the web apps.
+      - name: Configure OpenHexa
         run: |
-          sudo journalctl -xeu openhexa.service
+          set -euo pipefail
+          docker run -d --name mailpit --network openhexa --restart unless-stopped axllent/mailpit:v1.20
+          HOST=$(docker network inspect --format='{{(index .IPAM.Config 0).Gateway}}' bridge)
+          sudo sed -i \
+            -e "s|^OVERRIDE_WORKSPACES_DATABASE_HOST=.*|OVERRIDE_WORKSPACES_DATABASE_HOST=${HOST}|" \
+            -e "s|^EMAIL_HOST=.*|EMAIL_HOST=mailpit|" \
+            -e "s|^EMAIL_PORT=.*|EMAIL_PORT=1025|" \
+            -e "s|^DEFAULT_FROM_EMAIL=.*|DEFAULT_FROM_EMAIL=openhexa@example.org|" \
+            -e "s|^WEBAPPS_DOMAIN=.*|WEBAPPS_DOMAIN=webapps.${E2E_HOSTNAME}|" \
+            /etc/openhexa/env.conf
+          printf '%s\n' 'TRUST_FORWARDED_PROTO="false"' "PROXY_HOSTNAME_AND_PORT=${E2E_HOSTNAME}" | sudo tee -a /etc/openhexa/env.conf
+          sudo grep -E '^(OVERRIDE_WORKSPACES_DATABASE_HOST|EMAIL_HOST|EMAIL_PORT|DEFAULT_FROM_EMAIL|WEBAPPS_DOMAIN)=' /etc/openhexa/env.conf
 
-      - name: Setup OpenHexa if run locally
-        if: ${{ env.ACT }}
-        run: |
-          set -x
-          sed -i -e "s%^.*WORKSPACE_STORAGE_LOCATION=.*$%WORKSPACE_STORAGE_LOCATION=\"${GITHUB_WORKSPACE}/workspaces\"%" /etc/openhexa/env.conf
-          set +x
+          sed "s/example\.com/${E2E_HOSTNAME}/g" nginx/openhexa.conf | sudo tee /etc/nginx/sites-available/openhexa > /dev/null
+          sudo ln -s /etc/nginx/sites-available/openhexa /etc/nginx/sites-enabled/
+          # A .localhost name is ::1 first, where only NGINX's default site
+          # listens and answers 404: without it, clients go on to 127.0.0.1.
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo nginx -t
 
-      - name: Start OpenHexa if run locally
-        if: ${{ env.ACT }}
-        run: /usr/share/openhexa/openhexa.sh -g start
+          sudo systemctl restart openhexa nginx
 
+      # The released package's status check does not know about a proxy yet,
+      # so it is left to the new one: here on a fresh install, and after the
+      # upgrade otherwise.
       - name: Get OpenHexa status
+        if: matrix.scenario == 'fresh'
         run: /usr/share/openhexa/openhexa.sh -g status
 
-      - name: Install smoke tests dependencies
-        working-directory: ./smoke-tests
+      - name: Check OpenHexa answers through NGINX
         run: |
-          npm ci
+          getent hosts "${E2E_HOSTNAME}" "e2e.webapps.${E2E_HOSTNAME}" || true
+          curl -fsS -o /dev/null -w "NGINX answers %{http_code} at %{url_effective}\n" "${E2E_BASE_URL}/login"
 
-      - name: Build smoke tests image
-        working-directory: ./smoke-tests
-        run: docker build -t openhexa/smoke-tests .
-
-      - name: Run smoke tests
+      # The suite is taken at the version of the app being packaged, so that it
+      # matches the app under test. A release from before the suite could run
+      # on a packaged install falls back to a branch.
+      - name: Pick the version of the e2e suite
+        id: suite
         run: |
-          SUPERUSER_PASSWORD=$(sudo grep -E '^DJANGO_SUPERUSER_PASSWORD=' /etc/openhexa/env.conf | cut -d= -f2-)
-          docker run -t --net=host \
-            -v "$(pwd)/test-results:/code/test-results" \
-            openhexa/smoke-tests http://localhost:3000/ root@openhexa.org "$SUPERUSER_PASSWORD"
+          set -euo pipefail
+          APP_VERSION=$(yq '.x-app.image' compose.yml | cut -d: -f2)
+          for ref in "$APP_VERSION" $E2E_FALLBACK_REFS; do
+            if curl -fsSIo /dev/null "https://raw.githubusercontent.com/BLSQ/openhexa-app/${ref}/e2e/seed/seed-tables.sql"; then
+              echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+              echo "E2E suite from openhexa-app at \`${ref}\` (app ${APP_VERSION})." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+          echo "::error::no e2e suite with its sample tables at ${APP_VERSION} ${E2E_FALLBACK_REFS}"
+          exit 1
 
-      - name: Keep test results
+      - name: Checkout the e2e suite
+        uses: actions/checkout@v7
+        with:
+          repository: BLSQ/openhexa-app
+          ref: ${{ steps.suite.outputs.ref }}
+          path: openhexa-app
+          sparse-checkout: e2e
+          persist-credentials: false
+
+      # Creates the account the suite signs in as, the organization and the
+      # workspace it works in, then loads the tables it reads.
+      - name: Seed the test data
+        run: |
+          set -euo pipefail
+          E2E_PASSWORD=$(openssl rand -hex 16)
+          echo "::add-mask::${E2E_PASSWORD}"
+          echo "E2E_PASSWORD=${E2E_PASSWORD}" >> "$GITHUB_ENV"
+          export E2E_PASSWORD
+          SEEDED=$(docker exec -i -e E2E_EMAIL -e E2E_PASSWORD -e E2E_ORGANIZATION_NAME \
+            -e E2E_ORGANIZATION_SHORT_NAME -e E2E_WORKSPACE_NAME \
+            app python manage.py shell < e2e/seed.py)
+          # Where the suite finds what was created
+          printf '%s\n' "$SEEDED" | grep -E '^E2E_(ORGANIZATION_ID|WORKSPACE_SLUG)=' | tee -a "$GITHUB_ENV"
+          # The URL is the one the containers use: from here it is on localhost.
+          DB_URL=$(printf '%s\n' "$SEEDED" | sed -n 's/^WORKSPACE_DATABASE_URL=//p' | sed -E 's#@[^:/]+:#@localhost:#')
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f openhexa-app/e2e/seed/seed-tables.sql
+
+      # The procedure of UPGRADING.md, with the package built by this run.
+      - name: Upgrade to the new OpenHexa
+        if: matrix.scenario == 'upgrade'
+        run: |
+          set -euo pipefail
+          sudo systemctl stop openhexa
+          sudo dpkg -i openhexa_*_amd64.deb
+          sudo /usr/share/openhexa/openhexa.sh -g update
+          sudo /usr/share/openhexa/openhexa.sh -g prepare
+          sudo systemctl start openhexa
+          dpkg-query -W openhexa
+          # Two sets of images now share the runner's disk.
+          df -h /
+
+      - name: Get OpenHexa status after the upgrade
+        if: matrix.scenario == 'upgrade'
+        run: /usr/share/openhexa/openhexa.sh -g status
+
+      - name: Use Node.js v22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: openhexa-app/e2e/package-lock.json
+
+      - name: Install the e2e suite
+        working-directory: openhexa-app/e2e
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+
+      # Unlike in openhexa-app, the report and the traces are kept: the only
+      # password they hold is the one of an install that ends with this job.
+      # e2e/excluded-tests.txt lists what is left out, and why.
+      - name: Run the e2e suite
+        working-directory: openhexa-app/e2e
+        env:
+          CI: true
+          PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+        run: |
+          EXCLUDED=$(grep -vE '^(#|$)' "$GITHUB_WORKSPACE/e2e/excluded-tests.txt" | paste -sd '|')
+          npx playwright test \
+            --grep-invert "$EXCLUDED" \
+            --reporter=github,list,html,json \
+            --trace retain-on-failure
+
+      - name: Summarize the e2e results
+        if: always()
+        run: |
+          e2e/summary.sh openhexa-app/e2e/results.json "${{ matrix.scenario }}" e2e/excluded-tests.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the e2e report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: Smoke tests results
-          path: test-results/
+          name: E2E report (${{ matrix.scenario }})
+          path: |
+            openhexa-app/e2e/playwright-report/
+            openhexa-app/e2e/test-results/
           if-no-files-found: ignore
 
+      - name: Keep OpenHexa logs
+        if: failure()
+        run: sudo /usr/share/openhexa/openhexa.sh -g logs > openhexa.log 2>&1 || true
 
-      - name: Stop OpenHexa
-        run: /usr/share/openhexa/openhexa.sh -g stop
+      - name: Upload OpenHexa logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: OpenHexa logs (${{ matrix.scenario }})
+          path: openhexa.log
+          if-no-files-found: ignore
 
       - name: Remove and purge package
-        run: sudo apt purge -y openhexa
+        if: matrix.scenario == 'fresh'
+        run: |
+          /usr/share/openhexa/openhexa.sh -g stop
+          sudo apt purge -y openhexa
 
   create_apt_repo:
     name: Create APT repo
-    needs: install
+    needs: e2e
+    # Not on pull requests: those from forks and Dependabot get no signing key.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       artifact_id: ${{ steps.upload-artifact.outputs.artifact-id }}
