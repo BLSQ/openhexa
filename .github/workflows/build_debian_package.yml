@@ -66,7 +66,10 @@ jobs:
       matrix:
         scenario: [upgrade, fresh]
     env:
-      E2E_BASE_URL: http://localhost:3000
+      # Published through NGINX as README.md describes. Any name under
+      # .localhost is the machine itself, so it needs no DNS.
+      E2E_HOSTNAME: openhexa.localhost
+      E2E_BASE_URL: http://openhexa.localhost
       # Created by e2e/seed.py, then looked for by the suite
       E2E_EMAIL: e2e@example.org
       E2E_ORGANIZATION_NAME: E2E Testing
@@ -92,7 +95,7 @@ jobs:
       - name: Install OpenHexa dependencies
         run: |
           sudo apt update
-          sudo apt install -y --no-install-recommends curl ca-certificates gettext-base openssl postgresql postgresql-postgis
+          sudo apt install -y --no-install-recommends curl ca-certificates gettext-base openssl postgresql postgresql-postgis nginx
           curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq &&\
               sudo mv /tmp/yq /usr/bin/yq &&\
               sudo chmod +x /usr/bin/yq
@@ -117,9 +120,10 @@ jobs:
           sudo systemctl status openhexa.service
           /usr/share/openhexa/setup.sh -g check
 
-      # What README.md asks of every install: the workspaces' databases are
-      # reached at the address of the server, here the one Docker gives it,
-      # and a mail server, here one that keeps the mail it is given.
+      # What README.md asks of an install: the workspaces' databases reached
+      # at the address of the server (here the one Docker gives it), a mail
+      # server (here one that keeps the mail it is given), and NGINX in front,
+      # with a domain for the web apps.
       - name: Configure OpenHexa
         run: |
           set -euo pipefail
@@ -130,12 +134,22 @@ jobs:
             -e "s|^EMAIL_HOST=.*|EMAIL_HOST=mailpit|" \
             -e "s|^EMAIL_PORT=.*|EMAIL_PORT=1025|" \
             -e "s|^DEFAULT_FROM_EMAIL=.*|DEFAULT_FROM_EMAIL=openhexa@example.org|" \
+            -e "s|^WEBAPPS_DOMAIN=.*|WEBAPPS_DOMAIN=webapps.${E2E_HOSTNAME}|" \
             /etc/openhexa/env.conf
-          sudo grep -E '^(OVERRIDE_WORKSPACES_DATABASE_HOST|EMAIL_HOST|EMAIL_PORT|DEFAULT_FROM_EMAIL)=' /etc/openhexa/env.conf
-          sudo systemctl restart openhexa
+          printf '%s\n' 'TRUST_FORWARDED_PROTO="false"' "PROXY_HOSTNAME_AND_PORT=${E2E_HOSTNAME}" | sudo tee -a /etc/openhexa/env.conf
+          sudo grep -E '^(OVERRIDE_WORKSPACES_DATABASE_HOST|EMAIL_HOST|EMAIL_PORT|DEFAULT_FROM_EMAIL|WEBAPPS_DOMAIN)=' /etc/openhexa/env.conf
+
+          sed "s/example\.com/${E2E_HOSTNAME}/g" nginx/openhexa.conf | sudo tee /etc/nginx/sites-available/openhexa > /dev/null
+          sudo ln -s /etc/nginx/sites-available/openhexa /etc/nginx/sites-enabled/
+          sudo nginx -t
+
+          sudo systemctl restart openhexa nginx
 
       - name: Get OpenHexa status
-        run: /usr/share/openhexa/openhexa.sh -g status
+        run: |
+          /usr/share/openhexa/openhexa.sh -g status
+          getent hosts "${E2E_HOSTNAME}" "e2e.webapps.${E2E_HOSTNAME}" || true
+          curl -fsS -o /dev/null -w "NGINX answers %{http_code} at %{url_effective}\n" "${E2E_BASE_URL}/login"
 
       # The suite is taken at the version of the app being packaged, so that it
       # matches the app under test. A release from before the suite could run

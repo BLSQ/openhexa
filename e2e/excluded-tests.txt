@@ -2,14 +2,7 @@
 # regular expression per line, matched against "file › describe › test".
 # Each one needs something an install made by this job does not have.
 
-# Web apps are only offered with WEBAPPS_DOMAIN, which needs a wildcard DNS.
-workspace-static-webapps\.spec
-workspace-webapps\.spec
-workspace-webapp-assistant\.spec
-the sidebar leads to every section
-
-# Without a proxy in front, the browser is given the backend's address on the
-# Docker network (http://app:8000), which it cannot reach: a webhook's URL, and
-# the stream of a run's messages while it runs.
-its webhook starts a run
+# The browser is given the backend's address on the Docker network
+# (http://app:8000), which it cannot reach, for the stream of a run's messages
+# while it runs.
 a running run streams its messages and can be stopped
