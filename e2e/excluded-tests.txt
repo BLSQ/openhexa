@@ -11,12 +11,14 @@ the sidebar leads to every section
 # No mail server: an invitation cannot be sent.
 an invitation is sent, resent and deleted
 
-# Without a public hostname, a webhook's URL is the backend's address on the
-# Docker network, which nothing outside of it can call.
+# Without a proxy in front, the browser is given the backend's address on the
+# Docker network (http://app:8000), which it cannot reach: a webhook's URL, and
+# the stream of a run's messages while it runs.
 its webhook starts a run
+a running run streams its messages and can be stopped
 
 # A new install has no pipeline template to create a pipeline from.
-a pipeline can be created from a template and deleted
+workspace-pipelines\.spec
 
 # Not in OpenHEXA 5.22.2 yet: /pipelines/ and /notebooks/ still are pages.
 the retired top-level pages lead to the workspaces
