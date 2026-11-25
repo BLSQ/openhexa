@@ -483,6 +483,16 @@ Warning: Make sure to remove your local `.env` before running it as `act` copies
 happens, it overrides other environment files that are provided to the compose
 project, which is used to configure it (`/etc/openhexa/env.conf`).
 
+Before the package is published, the `e2e` job runs the
+[end-to-end suite of openhexa-app](https://github.com/BLSQ/openhexa-app/tree/main/e2e)
+against it on two runners: one installs the released package from our APT
+repository and upgrades it to the new one, the other installs the new one on a
+clean machine. The suite is taken at the version of the app being packaged (the
+`blsq/openhexa-app` tag in `compose.yml`), and its seed script creates the
+organization, workspace and tables it needs. The APT repository is only updated
+when both pass. The report of each run, with a trace of every failed test, is
+kept as an artifact of the workflow run.
+
 ##### The storage engine
 
 Locally, we use Minio to manage the storage. It provides a AWS S3 compatible

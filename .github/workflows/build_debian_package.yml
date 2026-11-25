@@ -161,9 +161,181 @@ jobs:
       - name: Remove and purge package
         run: sudo apt purge -y openhexa
 
+  # Runs the openhexa-app e2e suite against the package, on two throwaway
+  # runners: one upgrades the released package to the new one, the other
+  # installs the new one on a clean machine.
+  e2e:
+    name: E2E suite (${{ matrix.scenario }})
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [upgrade, fresh]
+    env:
+      E2E_BASE_URL: http://localhost:3000
+      E2E_EMAIL: root@openhexa.org
+      # What a packaged install does not have, see openhexa-app/e2e/README.md
+      E2E_SERVER_CONFIGURATION_AI_ENABLED: "false"
+      E2E_SERVER_CONFIGURATION_SELF_REGISTRATION_ENABLED: "false"
+      E2E_SERVER_CONFIGURATION_SUBSCRIPTION_CONSOLE_ENABLED: "false"
+      # Specs left out: static web apps are served on a subdomain, which needs
+      # WEBAPPS_DOMAIN and a wildcard DNS.
+      E2E_EXCLUDED_SPECS: workspace-static-webapps\.spec
+      # Branches of openhexa-app to take the suite from while no release has
+      # it yet, in order of preference.
+      E2E_FALLBACK_REFS: main chore-e2e-capabilities
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Retrieve package
+        uses: actions/download-artifact@v8
+        with:
+          name: debian_package_amd64
+
+      - name: Install OpenHexa dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends curl ca-certificates gettext-base openssl postgresql postgresql-postgis
+          curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq &&\
+              sudo mv /tmp/yq /usr/bin/yq &&\
+              sudo chmod +x /usr/bin/yq
+          sudo systemctl restart postgresql
+
+      # The way a new user installs it: from the signed public APT repo.
+      - name: Install the released OpenHexa
+        if: matrix.scenario == 'upgrade'
+        run: |
+          sudo gpg --yes --dearmor --output /usr/share/keyrings/openhexa.gpg < pubkey.gpg
+          echo "deb [signed-by=/usr/share/keyrings/openhexa.gpg] https://viz.bluesquare.org/openhexa/ ${CODENAME} ${COMPONENTS}" | sudo tee /etc/apt/sources.list.d/openhexa.list
+          sudo apt update
+          sudo apt install -y --no-install-recommends openhexa
+          dpkg-query -W openhexa
+
+      - name: Install the new OpenHexa
+        if: matrix.scenario == 'fresh'
+        run: sudo dpkg -i openhexa_*_amd64.deb
+
+      - name: Get OpenHexa status
+        run: /usr/share/openhexa/openhexa.sh -g status
+
+      # The suite is taken at the version of the app being packaged, so that it
+      # matches the app under test. A release from before the suite could be
+      # seeded falls back to a branch.
+      - name: Pick the version of the e2e suite
+        id: suite
+        run: |
+          set -euo pipefail
+          APP_VERSION=$(yq '.x-app.image' compose.yml | cut -d: -f2)
+          for ref in "$APP_VERSION" $E2E_FALLBACK_REFS; do
+            if curl -fsSIo /dev/null "https://raw.githubusercontent.com/BLSQ/openhexa-app/${ref}/e2e/seed/seed.py"; then
+              echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+              echo "E2E suite from openhexa-app at \`${ref}\` (app ${APP_VERSION})." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+          echo "::error::no e2e suite with a seed script at ${APP_VERSION} ${E2E_FALLBACK_REFS}"
+          exit 1
+
+      - name: Checkout the e2e suite
+        uses: actions/checkout@v7
+        with:
+          repository: BLSQ/openhexa-app
+          ref: ${{ steps.suite.outputs.ref }}
+          path: openhexa-app
+          sparse-checkout: e2e
+          persist-credentials: false
+
+      # Creates the organization and the workspace the suite works in, with
+      # the superuser as their owner, then loads the tables it reads.
+      - name: Seed the test data
+        run: |
+          set -euo pipefail
+          DB_PORT=$(sudo grep -E '^DATABASE_PORT=' /etc/openhexa/env.conf | cut -d= -f2- | tr -d '"')
+          DB_URL=$(docker exec -i -e E2E_EMAIL app python manage.py shell < openhexa-app/e2e/seed/seed.py \
+            | sed -n 's/^WORKSPACE_DATABASE_URL=//p')
+          if [ -z "$DB_URL" ]; then
+            echo "::error::the seed script did not give the workspace's database"
+            exit 1
+          fi
+          # The URL is the one the containers use: from here it is on localhost.
+          DB_URL=$(printf '%s' "$DB_URL" | sed -E "s#@[^/]+/#@localhost:${DB_PORT}/#")
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f openhexa-app/e2e/seed/seed-tables.sql
+
+      # The procedure of UPGRADING.md, with the package built by this run.
+      - name: Upgrade to the new OpenHexa
+        if: matrix.scenario == 'upgrade'
+        run: |
+          set -euo pipefail
+          sudo systemctl stop openhexa
+          sudo dpkg -i openhexa_*_amd64.deb
+          sudo /usr/share/openhexa/openhexa.sh -g update
+          sudo /usr/share/openhexa/openhexa.sh -g prepare
+          sudo systemctl start openhexa
+          dpkg-query -W openhexa
+          # Two sets of images now share the runner's disk.
+          df -h /
+
+      - name: Get OpenHexa status after the upgrade
+        if: matrix.scenario == 'upgrade'
+        run: /usr/share/openhexa/openhexa.sh -g status
+
+      - name: Use Node.js v22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: openhexa-app/e2e/package-lock.json
+
+      - name: Install the e2e suite
+        working-directory: openhexa-app/e2e
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+
+      # Unlike in openhexa-app, the report and the traces are kept: the only
+      # password they hold is the one of an install that ends with this job.
+      - name: Run the e2e suite
+        working-directory: openhexa-app/e2e
+        env:
+          CI: true
+          PLAYWRIGHT_HTML_OPEN: never
+        run: |
+          E2E_PASSWORD=$(sudo grep -E '^DJANGO_SUPERUSER_PASSWORD=' /etc/openhexa/env.conf | cut -d= -f2-)
+          export E2E_PASSWORD
+          npx playwright test \
+            --grep-invert "$E2E_EXCLUDED_SPECS" \
+            --reporter=github,list,html \
+            --trace retain-on-failure
+
+      - name: Keep the e2e report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: E2E report (${{ matrix.scenario }})
+          path: |
+            openhexa-app/e2e/playwright-report/
+            openhexa-app/e2e/test-results/
+          if-no-files-found: ignore
+
+      - name: Keep OpenHexa logs
+        if: failure()
+        run: sudo /usr/share/openhexa/openhexa.sh -g logs > openhexa.log 2>&1 || true
+
+      - name: Upload OpenHexa logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: OpenHexa logs (${{ matrix.scenario }})
+          path: openhexa.log
+          if-no-files-found: ignore
+
   create_apt_repo:
     name: Create APT repo
-    needs: install
+    needs: [install, e2e]
     runs-on: ubuntu-latest
     outputs:
       artifact_id: ${{ steps.upload-artifact.outputs.artifact-id }}
