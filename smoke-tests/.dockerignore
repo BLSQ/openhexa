@@ -1,6 +1,0 @@
-*.env
-*.env.*
-.github
-.git
-.idea
-**/*.DS_Store

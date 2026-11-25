@@ -465,33 +465,35 @@ These are documented per version, newest first, in [UPGRADING.md](./UPGRADING.md
 
 #### Test
 
-To test if OpenHexa has been correctly installed, you can run smoke tests that
-will check minimum operation. To learn how to do so, please read its
-[dedicated README](./smoke-tests/README.md).
+To test if OpenHexa has been correctly installed, you can run the
+[end-to-end suite of openhexa-app](https://github.com/BLSQ/openhexa-app/tree/main/e2e)
+against it, as our CI does (see below).
 
 #### CI
 
-We use Github Actions to automate the package building and its tests. If you
-want to run our workflows locally, you can use [`act`](https://nektosact.com/)
-as it follows:
+We use Github Actions to automate the package building and its tests, on every
+pull request and on `main`.
+
+Once the package is built, the `e2e` job installs it and runs the
+[end-to-end suite of openhexa-app](https://github.com/BLSQ/openhexa-app/tree/main/e2e)
+on two runners: one installs the released package from our APT repository and
+upgrades it to the new one, the other installs the new one on a clean machine.
+The suite is taken at the version of the app being packaged (the
+`blsq/openhexa-app` tag in `compose.yml`); `e2e/seed.py` creates the account,
+organization and workspace it works in, and its sample tables are loaded.
+`e2e/excluded-tests.txt` lists the tests left out, and why. The APT repository
+is only updated when both pass. The report of each run, with a trace of every
+failed test, is kept as an artifact of the workflow run.
+
+If you want to build the package locally the way the workflow does, you can use
+[`act`](https://nektosact.com/):
 
 ```bash
-act --action-offline-mode push
+act --action-offline-mode --job package pull_request
 ```
 
-Warning: Make sure to remove your local `.env` before running it as `act` copies your working copy rather than using the checking out action. When it
-happens, it overrides other environment files that are provided to the compose
-project, which is used to configure it (`/etc/openhexa/env.conf`).
-
-Before the package is published, the `e2e` job runs the
-[end-to-end suite of openhexa-app](https://github.com/BLSQ/openhexa-app/tree/main/e2e)
-against it on two runners: one installs the released package from our APT
-repository and upgrades it to the new one, the other installs the new one on a
-clean machine. The suite is taken at the version of the app being packaged (the
-`blsq/openhexa-app` tag in `compose.yml`); `e2e/seed.py` creates the
-organization and workspace it works in, and its sample tables are loaded. The
-APT repository is only updated when both pass. The report of each run, with a
-trace of every failed test, is kept as an artifact of the workflow run.
+Warning: Make sure to remove your local `.env` before running it as `act` copies
+your working copy rather than using the checking out action.
 
 ##### The storage engine
 
