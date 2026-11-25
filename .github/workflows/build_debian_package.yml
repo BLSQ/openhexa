@@ -274,7 +274,8 @@ jobs:
             app python manage.py shell < e2e/seed.py)
           # Where the suite finds what was created
           printf '%s\n' "$SEEDED" | grep -E '^E2E_(ORGANIZATION_ID|WORKSPACE_SLUG)=' | tee -a "$GITHUB_ENV"
-          DB_URL=$(printf '%s\n' "$SEEDED" | sed -n 's/^WORKSPACE_DATABASE_URL=//p')
+          # The URL is the one the containers use: from here it is on localhost.
+          DB_URL=$(printf '%s\n' "$SEEDED" | sed -n 's/^WORKSPACE_DATABASE_URL=//p' | sed -E 's#@[^:/]+:#@localhost:#')
           psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f openhexa-app/e2e/seed/seed-tables.sql
 
       # The procedure of UPGRADING.md, with the package built by this run.
