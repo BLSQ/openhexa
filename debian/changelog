@@ -1,3 +1,13 @@
+openhexa (5.23.0-1) stable; urgency=medium
+
+  [ blsqbot ]
+  * Update OpenHEXA to version 5.23.0
+  * Public dataset sharing via frontend, MCP read_file restricted to source
+    code files, plan expiration banners, auto-create account on console
+    sign-up, getting started video placeholder, Mistral OAuth callback
+
+ -- blsqbot <blsqbot@users.noreply.github.com>  Fri, 27 Nov 2026 15:22:24 +0000
+
 openhexa (5.22.2-1) stable; urgency=high
 
   [ blsqbot ]
